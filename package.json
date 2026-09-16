@@ -1,0 +1,12 @@
+{
+  "name": "superdaddy",
+  "version": "0.1.0",
+  "description": "SuperDaddy Workbench — local-first baby care tracker. Your baby's data never leaves the device.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "serve": "node server.js"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- superdaddy 图标：暖橘圆角底 + 奶瓶 -->
+  <rect width="64" height="64" rx="14" fill="#e8590c"/>
+  <path d="M27 12 h10 v6 h-10 z" fill="#fff" opacity=".9"/>
+  <path d="M25 20 h14 l3 8 v20 a4 4 0 0 1 -4 4 h-12 a4 4 0 0 1 -4 -4 v-20 z" fill="#fff"/>
+  <rect x="26" y="32" width="12" height="10" rx="2" fill="#e8590c" opacity=".25"/>
+  <rect x="28" y="34" width="8" height="6" rx="1.5" fill="#faf9f7"/>
+</svg>

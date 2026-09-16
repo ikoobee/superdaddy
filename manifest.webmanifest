@@ -1,0 +1,14 @@
+{
+  "name": "超级奶爸工作台",
+  "short_name": "奶爸工作台",
+  "description": "本地优先的家庭育儿记录工具——宝宝的数据永不上传",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf9f7",
+  "theme_color": "#e8590c",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

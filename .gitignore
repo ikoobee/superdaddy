@@ -1,0 +1,7 @@
+# 本地开发文件（商业策略/交接笔记，不入公开仓——原件在私有区）
+HANDOFF.md
+SCOPE.md
+docs/STRATEGY.md
+
+node_modules/
+*.log

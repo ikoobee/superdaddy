@@ -1,0 +1,45 @@
+/* 设计令牌 —— /ui-ux-design 规范；母婴场景暖色单色系（避开 AI 模板蓝紫） */
+:root {
+  /* 中性阶 */
+  --gray-50: #faf9f7; --gray-100: #f4f2ef; --gray-200: #e7e4df;
+  --gray-300: #d4d0c9; --gray-400: #a39d93; --gray-500: #7d766c;
+  --gray-600: #5c554c; --gray-800: #33302b; --gray-900: #211f1b;
+
+  /* 主色：暖橘（行动与状态专用） */
+  --primary-50: #fdf3ee; --primary-300: #f5b8a0;
+  --primary-500: #e8590c; --primary-600: #c94a08;
+
+  /* 语义色 */
+  --ok: #2f855a; --warn: #b7791f; --danger: #c53030;
+
+  /* 字号（模数 ≈1.25） */
+  --text-sm: .875rem; --text-base: 1rem; --text-lg: 1.25rem;
+  --text-xl: 1.563rem; --text-2xl: 1.953rem; --text-3xl: 2.441rem;
+
+  /* 间距（4 倍数） */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-6: 24px; --space-8: 32px;
+
+  --radius-sm: 6px; --radius-md: 12px; --radius-lg: 18px;
+  --shadow-sm: 0 1px 2px rgba(33,31,27,.06);
+  --shadow-lg: 0 10px 30px rgba(33,31,27,.14);
+
+  --font-display: 'Avenir Next', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-body: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+
+  --surface: #ffffff;
+  --header-bg: rgba(250, 249, 247, 0.92);
+}
+
+/* 夜间模式（夜奶场景：跟随系统，零 JS） */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gray-50: #1c1a17; --gray-100: #242220; --gray-200: #33302b;
+    --gray-300: #4a453e; --gray-400: #6f6960; --gray-500: #948d82;
+    --gray-600: #b5aea2; --gray-800: #d9d4cb; --gray-900: #ece8e1;
+    --primary-50: #3a2318; --primary-300: #b0734a;
+    --ok: #4cb782; --warn: #d8a13f; --danger: #e5716b;
+    --surface: #242220;
+    --header-bg: rgba(28, 26, 23, 0.92);
+  }
+}

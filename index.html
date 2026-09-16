@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>超级奶爸工作台 — 宝宝的数据永不上传</title>
+  <meta name="description" content="本地优先的家庭育儿记录工具：打卡/生长曲线/疫苗/指南/妈妈护理/辅食观察/交接卡。数据只存在你的设备上，零上传零账号。">
+  <meta property="og:title" content="超级奶爸工作台">
+  <meta property="og:description" content="宝宝的数据永不上传——本地优先育儿记录工具。">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#e8590c">
+  <!-- manifest 由 app.js 按协议动态注入：file:// 下浏览器会因 CORS 拒绝加载 -->
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/app.css">
+</head>
+<body>
+  <header class="top">
+    <span class="top-left">
+      <a href="#home" id="back-btn" class="backbtn" hidden title="返回首页">🏠</a>
+      <span class="brand">超级奶爸工作台</span>
+    </span>
+    <span class="top-right">
+      <span id="age-chip" class="age-chip" hidden></span>
+      <a href="#settings" class="gear" title="设置">⚙️</a>
+    </span>
+  </header>
+
+  <main id="view"></main>
+
+  <nav class="tabs">
+    <a href="#home" data-view="home"><span class="ico">🏠</span>首页</a>
+    <a href="#feed" data-view="feed"><span class="ico">📝</span>记录</a>
+    <a href="#growth" data-view="growth"><span class="ico">📈</span>成长</a>
+    <a href="#guide" data-view="guide"><span class="ico">📚</span>育儿</a>
+    <a href="#family" data-view="family"><span class="ico">👨‍👩‍👧</span>家庭</a>
+  </nav>
+
+  <!-- 经典脚本（file:// 双击可用；顺序敏感） -->
+  <script src="src/boot.js"></script>
+  <script src="src/data/vaccine.data.js"></script>
+  <script src="src/data/who.data.js"></script>
+  <script src="src/data/guide.data.js"></script>
+  <script src="src/data/feed.data.js"></script>
+  <script src="src/data/epds.data.js"></script>
+  <script src="src/data/bf_med.data.js"></script>
+  <script src="src/data/health.data.js"></script>
+  <script src="src/data/mom.data.js"></script>
+  <script src="src/data/milestone.data.js"></script>
+  <script src="src/data/sleep_ref.data.js"></script>
+  <script src="src/data/day42.data.js"></script>
+  <script src="src/data/bag.data.js"></script>
+  <script src="src/utils/time.js"></script>
+  <script src="src/utils/vaccine.js"></script>
+  <script src="src/utils/summary.js"></script>
+  <script src="src/utils/growth.js"></script>
+  <script src="src/utils/features.js"></script>
+  <script src="src/utils/trends.js"></script>
+  <script src="src/utils/tasks.js"></script>
+  <script src="src/utils/cal.js"></script>
+  <script src="src/ui.js"></script>
+  <script src="src/store.js"></script>
+  <script src="src/views.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>
