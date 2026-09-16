@@ -65,7 +65,7 @@ SD.views = (() => {
       <div class="card">
         <label class="field">宝宝小名</label><input type="text" id="c-name" placeholder="例如：小柿子">
         <label class="field">出生日期</label><input type="date" id="c-birth">
-        <label class="field">性别</label><select id="c-gender"><option value="">不填</option><option value="m">男</option><option value="f">女</option></select>
+        <label class="field">性别</label><select id="c-gender"><option value="">保密</option><option value="m">男</option><option value="f">女</option></select>
         <p></p><button class="btn" id="c-save">开始记录</button>
       </div>`
     el.querySelector('#c-birth').max = SD.time.todayStr()
@@ -1129,7 +1129,7 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
       <h3>添加宝宝</h3>
       <label class="field">小名</label><input type="text" id="am-name" placeholder="例如：小核桃">
       <label class="field">出生日期</label><input type="date" id="am-birth">
-      <label class="field">性别</label><select id="am-gender"><option value="">不填</option><option value="m">男</option><option value="f">女</option></select>
+      <label class="field">性别</label><select id="am-gender"><option value="">保密</option><option value="m">男</option><option value="f">女</option></select>
       <p></p>
       <div class="row">
         <button class="btn ghost" id="am-cancel">取消</button>
