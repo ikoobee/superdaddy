@@ -26,7 +26,10 @@ SD.app = (() => {
     if (!c) { chip.hidden = true; return }
     const multi = SD.state.children.length > 1
     chip.hidden = false
-    chip.innerHTML = `${esc(c.name)} · 第 ${SD.time.ageParts(c.birth).days} 天${multi ? ' <b class="chip-arrow">›</b>' : ''}`
+    const label = c.birth
+      ? `第 ${SD.time.ageParts(c.birth).days} 天`
+      : (() => { const p = SD.preg.pregParts(c.due); return `孕 ${p.week}周+${p.day}` })()
+    chip.innerHTML = `${esc(c.name)} · ${label}${multi ? ' <b class="chip-arrow">›</b>' : ''}`
     chip.dataset.multi = multi ? '1' : ''
   }
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -89,7 +92,7 @@ SD.app = (() => {
     }
     menu.innerHTML = SD.state.children.map(c => `
       <button data-cid="${c.id}" class="${c.id === SD.state.activeId ? 'on' : ''}">
-        <span>${esc(c.name)}</span><span class="note">第 ${SD.time.ageParts(c.birth).days} 天</span>
+        <span>${esc(c.name)}</span><span class="note">${c.birth ? '第 ' + SD.time.ageParts(c.birth).days + ' 天' : '孕 ' + SD.preg.pregParts(c.due).week + ' 周'}</span>
       </button>`).join('') +
       `<button data-add="1"><span>＋ 添加宝宝</span></button>`
     menu.hidden = false

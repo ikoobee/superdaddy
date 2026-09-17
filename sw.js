@@ -5,7 +5,7 @@ const CORE = [
   'styles/tokens.css', 'styles/app.css',
   'src/boot.js', 'src/ui.js', 'src/store.js', 'src/views.js', 'src/app.js',
   'src/utils/time.js', 'src/utils/vaccine.js', 'src/utils/summary.js',
-  'src/utils/growth.js', 'src/utils/features.js', 'src/utils/trends.js', 'src/utils/tasks.js', 'src/utils/cal.js',
+  'src/utils/growth.js', 'src/utils/features.js', 'src/utils/trends.js', 'src/utils/tasks.js', 'src/utils/cal.js', 'src/utils/preg.js',
   'src/data/vaccine.data.js', 'src/data/who.data.js', 'src/data/guide.data.js',
   'src/data/feed.data.js', 'src/data/epds.data.js', 'src/data/bf_med.data.js',
   'src/data/health.data.js', 'src/data/mom.data.js', 'src/data/milestone.data.js',

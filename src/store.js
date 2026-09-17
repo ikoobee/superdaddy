@@ -18,9 +18,15 @@ SD.store = (() => {
     load, save,
     get state() { return SD.state },
     get child() { return SD.state.children.find(c => c.id === SD.state.activeId) || null },
-    addChild({ name, birth, gender }) {
-      const c = { id: uid(), name, birth, gender: gender || '' }
+    addChild({ name, birth, due, gender }) {
+      const c = { id: uid(), name, birth: birth || null, due: due || null, gender: gender || '' }
       SD.state.children.push(c); SD.state.activeId = c.id; save(); return c
+    },
+    /** 宝宝出生转正：补生日，孕期记录原样归档保留 */
+    registerBirth(id, birth) {
+      const c = SD.state.children.find(x => x.id === id)
+      if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(birth)) return false
+      c.birth = birth; save(); return true
     },
     switchChild(id) { SD.state.activeId = id; save() },
     removeChild(id, confirmText) {

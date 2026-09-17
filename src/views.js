@@ -3,6 +3,8 @@ SD.views = (() => {
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
   const back = '<p><a href="#home" class="backlink">← 返回首页</a></p>'
   const child = () => SD.store.child
+  const moOf = c => (c && c.birth) ? SD.time.ageParts(c.birth).totalMo : 0
+  const bornGuard = el => `<div class="card"><h3>👶 出生后解锁</h3><p class="note">这一页用到宝宝生日（疫苗/生长/月龄计算）。</p></div><a class="card linkcard" href="#bag"><h3>🎒 先去准备待产包</h3></a><a class="card linkcard" href="#day42"><h3>📖 预习 42 天月子餐</h3></a>`
 
   /* 分段条：attr=dataset 键，items=[[seg,label]]，cur=当前段 */
   function segBar(attr, items, cur) {
@@ -18,6 +20,7 @@ SD.views = (() => {
   function home(el) {
     if (!child()) return onboard(el)
     const c = child()
+    if (!c.birth) return pregHome(el)
     const p = SD.time.ageParts(c.birth)
     const s = SD.summary.summarizeDay(SD.store.recordsOf(), SD.time.todayStr())
     const vacList = SD.vaccine.scheduleFor(c.birth, SD.store.vaccineDone())
@@ -59,22 +62,180 @@ SD.views = (() => {
     }))
   }
 
+  /* ══════════ 🤰 孕期首页与工具（未出生模式） ══════════ */
+  function pregHome(el) {
+    const c = child(), preg = SD.preg.pregParts(c.due)
+    const recs = SD.store.recordsOf()
+    const checkups = recs.filter(r => r.type === 'checkup').slice(-3).reverse()
+    const bagDone = recs.filter(r => r.type === 'bag').length
+    const bagTotal = SD.DATA.bag.cats.reduce((a, x) => a + x.items.length, 0)
+    el.innerHTML = `
+      <div class="hero-age">
+        <div class="days">孕 ${preg.week}<small style="font-size:1.3rem">周+${preg.day}</small></div>
+        <div class="sub">距预产期 ${preg.daysLeft} 天 · ${esc(c.name)} · ${c.due}</div>
+      </div>
+      <div class="quick-row">
+        <a class="quick-btn primary" href="#birth">🏥 产检</a>
+        <a class="quick-btn" href="#birth">⚖️ 体重</a>
+        <a class="quick-btn" href="#birth">👶 胎动</a>
+        <a class="quick-btn" href="#birth">⏱️ 宫缩</a>
+      </div>
+      <a class="card linkcard" href="#bag"><h3>🎒 待产包 ${bagDone}/${bagTotal}</h3><p class="note">孕 34-37 周备好 → 去勾选</p></a>
+      <a class="card linkcard" href="#day42"><h3>📖 42 天月子餐预习</h3><p class="note">产后每天吃什么，现在就能看</p></a>
+      ${checkups.length ? `<div class="sec-title">近期产检</div>` + checkups.map(r =>
+        `<div class="tl-item"><span class="icon">🏥</span><span class="desc">${r.date} ${esc(r.item)}${r.note ? ' · ' + esc(r.note) : ''}</span></div>`).join('') : ''}
+      <p class="note" style="text-align:center">宝宝出生后：设置 → 档案 →「🎉 出生了」一键转正</p>`
+  }
+
+  function pregnancyBody(el) {
+    const c = child(), preg = SD.preg.pregParts(c.due)
+    const recs = SD.store.recordsOf()
+    const checkups = recs.filter(r => r.type === 'checkup').slice(-6).reverse()
+    const weights = recs.filter(r => r.type === 'pweight').slice(-8).reverse()
+    el.innerHTML = `
+      <div class="card"><h3>🤰 孕 ${preg.week} 周+${preg.day} · 距预产期 ${preg.daysLeft} 天</h3><p class="note">预产期 ${c.due}（按 280 天推算，以产检为准）</p></div>
+
+      <div class="card"><h3>🏥 产检记录</h3>
+        <label class="field">日期</label><input type="date" id="cp-date">
+        <label class="field">项目</label>
+        <select id="cp-item"><option>常规产检</option><option>NT（11-13 周）</option><option>唐筛/无创</option><option>大排畸（20-24 周）</option><option>糖耐（24-28 周）</option><option>B 超</option><option>胎心监护</option><option>其他</option></select>
+        <label class="field">备注（可空）</label><input type="text" id="cp-note" placeholder="结果/医生嘱咐">
+        <p></p><button class="btn" id="cp-save">记录产检</button>
+        ${checkups.length ? `<div class="sec-title">近期</div>` + checkups.map(r =>
+          `<div class="tl-item"><span class="icon">🏥</span><span class="desc">${r.date} ${esc(r.item)}${r.note ? ' · ' + esc(r.note) : ''}</span><button class="del" data-id="${r.id}">✕</button></div>`).join('') : ''}
+      </div>
+
+      <div class="card"><h3>⚖️ 孕期体重 (kg)</h3>
+        <div style="display:flex;gap:8px">
+          <input type="date" id="pw-date" style="flex:1.3">
+          <input type="number" id="pw-val" step="0.1" placeholder="kg" style="flex:1">
+          <button class="btn" id="pw-save">记</button>
+        </div>
+        ${weights.length ? weights.map((r, i) => {
+          const prev = weights[i + 1]
+          const d = prev ? (r.val - prev.val).toFixed(1) : null
+          return `<div class="tl-item"><span class="icon">⚖️</span><span class="desc">${r.date}</span><b>${r.val}kg</b>${d !== null ? `<span class="note" style="color:${d > 0 ? 'var(--warn)' : 'var(--ok)'}">${d > 0 ? '+' : ''}${d}</span>` : ''}<button class="del" data-id="${r.id}">✕</button></div>`
+        }).join('') : '<p class="note">整孕期增重参考：孕前 BMI 正常约 11.5-16kg（以医生意见为准）</p>'}
+      </div>
+
+      <div class="card"><h3>👶 胎动计数（10 次法）</h3>
+        <p class="note">孕 28 周后每天固定时段：2 小时内数满 10 次为正常。</p>
+        <div class="timer-face" id="k-count">0<small style="font-size:1.2rem;color:var(--gray-400)">/10</small></div>
+        <button class="btn primary-big" id="k-tap">踢了一下 +1</button>
+        <p class="note" id="k-state">点第一次时自动开始计时</p>
+        <button class="btn ghost" id="k-reset" style="margin-top:8px">重置</button>
+      </div>
+
+      <div class="card"><h3>⏱️ 宫缩计时（5-1-1 规则）</h3>
+        <p class="note">宫缩来了点「开始」，过去了点「结束」；凑够次数自动评估。</p>
+        <button class="btn primary-big" id="ct-btn">▶ 宫缩开始</button>
+        <p class="note" id="ct-state"></p>
+        <div id="ct-list"></div>
+        <div id="ct-advice"></div>
+      </div>
+
+      <div class="card redcard"><h3>🚨 不等 5-1-1，立即就医</h3>
+        <ul class="list"><li>破水：平躺垫高臀部，勿走动</li><li>出血如月经量</li><li>剧烈腹痛 / 胎动明显减少</li><li>头痛眼花、视物模糊、水肿骤增</li></ul>
+      </div>`
+
+    el.querySelector('#cp-date').value = SD.time.todayStr()
+    el.querySelector('#pw-date').value = SD.time.todayStr()
+    el.querySelector('#cp-save').addEventListener('click', () => {
+      const item = el.querySelector('#cp-item').value, date = el.querySelector('#cp-date').value
+      if (!date) return SD.ui.toast('选日期')
+      SD.store.addRecord({ type: 'checkup', date, item, note: el.querySelector('#cp-note').value.trim() })
+      pregnancyBody(el)
+    })
+    el.querySelector('#pw-save').addEventListener('click', () => {
+      const v = +el.querySelector('#pw-val').value, date = el.querySelector('#pw-date').value
+      if (!v || v < 30 || v > 200) return SD.ui.toast('体重 30-200kg')
+      SD.store.addRecord({ type: 'pweight', date, val: v })
+      pregnancyBody(el)
+    })
+    el.querySelectorAll('.del').forEach(b => b.addEventListener('click', () => { SD.store.removeRecord(b.dataset.id); pregnancyBody(el) }))
+
+    // 胎动（会话态，10 次自动存档）
+    const kCount = el.querySelector('#k-count'), kState = el.querySelector('#k-state')
+    const paint = () => { kCount.innerHTML = `${kick.count}<small style="font-size:1.2rem;color:var(--gray-400)">/10</small>` }
+    paint()
+    el.querySelector('#k-tap').addEventListener('click', () => {
+      if (!kick.start) { kick.start = Date.now(); kState.textContent = '计时中…' }
+      kick.count++
+      if (kick.count >= 10) {
+        const mins = Math.max(1, Math.round((Date.now() - kick.start) / 60000))
+        const fmt = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') }
+        SD.store.addRecord({ type: 'kick', date: SD.time.todayStr(), start: fmt(kick.start), end: fmt(Date.now()), minutes: mins, count: 10 })
+        kState.textContent = `✅ 10 次用时 ${mins} 分钟${mins <= 60 ? '（正常）' : '（偏慢，换个时段再数；持续异常就医）'}`
+        kick = { start: null, count: 0 }
+        paint()
+        return
+      }
+      paint()
+    })
+    el.querySelector('#k-reset').addEventListener('click', () => { kick = { start: null, count: 0 }; kState.textContent = '已重置'; paint() })
+
+    // 宫缩（会话态，自动 5-1-1 评估近 1 小时）
+    const ctBtn = el.querySelector('#ct-btn'), ctState = el.querySelector('#ct-state'), ctList = el.querySelector('#ct-list'), ctAdvice = el.querySelector('#ct-advice')
+    const renderCt = () => {
+      const hourAgo = Date.now() - 3600e3
+      const recent = ct.marks.filter(m => m.t >= hourAgo)
+      ctList.innerHTML = ct.marks.slice(-6).reverse().map(m =>
+        `<div class="tl-item"><span class="icon">⏱️</span><span class="desc">间隔约 ${m.gap} 分</span><b>${m.dur} 秒</b></div>`).join('')
+      if (recent.length >= 2) {
+        const r = SD.preg.contractionAdvice(recent.map(m => ({ gap: m.gap, dur: m.dur })))
+        ctAdvice.innerHTML = `<div class="card ${r.level === 'go' ? 'redcard' : ''}" style="margin-top:8px"><h3>${r.level === 'go' ? '🚑' : '👀'} ${r.text}</h3></div>`
+      }
+    }
+    renderCt()
+    ctBtn.addEventListener('click', () => {
+      if (!ct.start) { ct.start = Date.now(); ctBtn.textContent = '⏹ 宫缩结束'; ctBtn.classList.add('rec'); ctState.textContent = '计时中…' }
+      else {
+        const dur = Math.round((Date.now() - ct.start) / 1000)
+        const last = ct.marks[ct.marks.length - 1]
+        const gap = last ? Math.round((ct.start - last.t) / 60000) : 0
+        ct.marks.push({ t: ct.start, dur, gap })
+        ct.start = null; ctBtn.textContent = '▶ 宫缩开始'; ctBtn.classList.remove('rec')
+        ctState.textContent = '已记录，继续观察下一次'
+        renderCt()
+      }
+    })
+  }
+  let kick = { start: null, count: 0 }
+  let ct = { start: null, marks: [] }
+
+  let obMode = 'born'   // born=已出生 wait=待出生
   function onboard(el) {
     el.innerHTML = `
       <div class="empty"><p>👋 欢迎使用超级奶爸工作台</p><p class="note">先建宝宝档案。所有数据只存在这台设备。</p></div>
       <div class="card">
+        <div class="seg">
+          <button class="seg-btn ${obMode === 'born' ? 'on' : ''}" data-ob="born">👶 已出生</button>
+          <button class="seg-btn ${obMode === 'wait' ? 'on' : ''}" data-ob="wait">🤰 还没出生</button>
+        </div>
         <label class="field">宝宝小名</label><input type="text" id="c-name" placeholder="例如：小柿子">
-        <label class="field">出生日期</label><input type="date" id="c-birth">
+        ${obMode === 'born'
+          ? '<label class="field">出生日期</label><input type="date" id="c-birth">'
+          : '<label class="field">预产期</label><input type="date" id="c-due">'}
         <label class="field">性别</label><select id="c-gender"><option value="">保密</option><option value="m">男</option><option value="f">女</option></select>
-        <p></p><button class="btn" id="c-save">开始记录</button>
+        <p></p><button class="btn" id="c-save">${obMode === 'born' ? '开始记录' : '开始孕期记录'}</button>
+        ${obMode === 'wait' ? '<p class="note" style="margin-top:8px">孕期可用：产检/体重/胎动/宫缩记录、待产包、月子餐预习；出生后一键转正。</p>' : ''}
       </div>`
-    el.querySelector('#c-birth').max = SD.time.todayStr()
+    const birthEl = el.querySelector('#c-birth')
+    if (birthEl) birthEl.max = SD.time.todayStr()
+    el.querySelectorAll('[data-ob]').forEach(b => b.addEventListener('click', () => { obMode = b.dataset.ob; onboard(el) }))
     el.querySelector('#c-save').addEventListener('click', () => {
       const name = el.querySelector('#c-name').value.trim()
-      const birth = el.querySelector('#c-birth').value
-      if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(birth)) return SD.ui.toast('小名和出生日期必填')
-      SD.store.addChild({ name, birth, gender: el.querySelector('#c-gender').value })
-      location.hash = '#home'; home(el)
+      if (!name) return SD.ui.toast('小名必填')
+      if (obMode === 'born') {
+        const birth = el.querySelector('#c-birth').value
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(birth)) return SD.ui.toast('出生日期必填')
+        SD.store.addChild({ name, birth, gender: el.querySelector('#c-gender').value })
+      } else {
+        const due = el.querySelector('#c-due').value
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return SD.ui.toast('预产期必填')
+        SD.store.addChild({ name, due, gender: el.querySelector('#c-gender').value })
+      }
+      location.hash = '#home'; SD.app.render()
     })
   }
 
@@ -169,7 +330,7 @@ SD.views = (() => {
   }
 
   /* ══════════ 📝 记录（时间轴） ══════════ */
-  const ICON = { feed: '🍼', sleep: '😴', pee: '💧', poop: '💩', vitd: '☀️', dha: '🐟', iron: '💊', temp: '🌡️', measure: '📏', food: '🥣', 'food-ok': '✅', 'food-react': '⚠️', diary: '📖', ms: '🏆' }
+  const ICON = { feed: '🍼', sleep: '😴', pee: '💧', poop: '💩', vitd: '☀️', dha: '🐟', iron: '💊', temp: '🌡️', measure: '📏', food: '🥣', 'food-ok': '✅', 'food-react': '⚠️', diary: '📖', ms: '🏆', checkup: '🏥', pweight: '⚖️', kick: '👶', contraction: '⏱️' }
   const LABEL = r => ({
     feed: `喂奶（${({ L: '左', R: '右', B: '双侧' })[r.side] || ''}${r.minutes ? ' ' + r.minutes + 'min' : ''}${r.ml ? ' +' + r.ml + 'ml' : ''}）`,
     sleep: `睡眠 ${r.start}–${r.end}`, pee: '尿尿', poop: '便便', vitd: '维生素D', dha: 'DHA', iron: '铁剂',
@@ -179,6 +340,10 @@ SD.views = (() => {
     'food-react': `${r.name} 可疑反应：${r.symptom}`,
     diary: `${r.name}${r.note ? ' · ' + r.note : ''}`,
     ms: `达成里程碑：${(r.key || '').split('|').join(' · ')}`,
+    checkup: `产检：${r.item}${r.note ? ' · ' + r.note : ''}`,
+    pweight: `孕期体重 ${r.val}kg`,
+    kick: `胎动 10 次用时 ${r.minutes} 分钟`,
+    contraction: `宫缩 1 小时：${r.count} 次 · 间隔 ${r.gap} 分 · 持续 ${r.dur} 秒`,
   }[r.type] || r.type)
 
   function feed(el) {
@@ -197,6 +362,7 @@ SD.views = (() => {
   /* ══════════ 📈 成长（曲线 ｜ 疫苗 ｜ 里程碑 ｜ 月历） ══════════ */
   function growth(el) {
     if (!child()) return onboard(el)
+    if (!child().birth) { el.innerHTML = bornGuard(); return }
     const seg = el.dataset.gseg || 'curve'
     el.innerHTML = segBar('gseg', [['curve', '📈 曲线'], ['vac', '💉 疫苗'], ['ms', '🏆 里程碑'], ['cal', '📅 月历']], seg) + '<div id="seg-body"></div>'
     const body = el.querySelector('#seg-body')
@@ -205,6 +371,7 @@ SD.views = (() => {
   }
 
   function renderCurve(el) {
+    if (!child().birth) { el.innerHTML = bornGuard(); return }
     const c = child(), mo = SD.time.ageParts(c.birth).totalMo
     const measures = SD.store.recordsOf().filter(r => r.type === 'measure').sort((a, b) => a.date < b.date ? -1 : 1)
     const lastM = measures[measures.length - 1]
@@ -334,7 +501,7 @@ SD.views = (() => {
   /* 里程碑打卡 + 第一次日记（成长 · 里程碑段） */
   const PRESETS = ['第一次笑出声', '第一次翻身', '第一次坐稳', '第一次叫爸爸/妈妈', '第一次长牙', '第一次爬', '第一次站', '第一次走', '第一次自主入睡']
   function diary(el) {
-    const c = child(), mo = SD.time.ageParts(c.birth).totalMo
+    const c = child(), mo = moOf(c)
     const recs = SD.store.recordsOf()
     const logs = recs.filter(r => r.type === 'diary').slice().reverse()
     const msDone = new Set(recs.filter(r => r.type === 'ms').map(r => r.key))
@@ -481,14 +648,15 @@ SD.views = (() => {
   function birthBody(el) {
     if (!child()) return onboard(el)
     const days = SD.time.ageParts(child().birth).days
-    const sub = el.dataset.birthsub ?? (Number.isFinite(days) && days <= 42 ? 'd42' : 'bag')
+    const sub = el.dataset.birthsub ?? (!child().birth ? 'preg' : (Number.isFinite(days) && days <= 42 ? 'd42' : 'bag'))
     delete el.dataset.birthsub   // 别名定向只生效一次
     el.innerHTML = `<div class="seg seg-main gfn-seg">
+        <button class="seg-btn ${sub === 'preg' ? 'on' : ''}" data-birth="preg">🤰 孕期</button>
         <button class="seg-btn ${sub === 'bag' ? 'on' : ''}" data-birth="bag">🎒 待产包</button>
         <button class="seg-btn ${sub === 'd42' ? 'on' : ''}" data-birth="d42">📖 42 天手册</button>
       </div><div id="birth-body"></div>`
     const body = el.querySelector('#birth-body')
-    ;({ bag: bagBody, d42: day42Body })[sub](body)
+    ;({ preg: pregnancyBody, bag: bagBody, d42: day42Body })[sub](body)
     el.querySelectorAll('[data-birth]').forEach(b => b.addEventListener('click', () => {
       el.dataset.birthsub = b.dataset.birth
       birthBody(el)
@@ -582,7 +750,7 @@ SD.views = (() => {
   const GFNS = [['edu', '🎓 早教'], ['feed', '🍼 喂养'], ['sleep', '😴 睡眠'], ['soothe', '😢 安抚']]
   function guideBody(el) {
     if (!child()) return onboard(el)
-    const c = child(), mo = SD.time.ageParts(c.birth).totalMo
+    const c = child(), mo = moOf(c)
     const keys = Object.keys(SD.DATA.guide).map(Number).filter(Number.isFinite).sort((a, b) => a - b)
     const curKey = Math.max(...keys.filter(k => k <= mo))
     const selKey = guideMonth ?? curKey
@@ -637,6 +805,7 @@ SD.views = (() => {
             `<button data-gmk="${k}" class="${k === selKey ? 'on' : ''}">${k} 月${k === curKey ? '<span class="note">本月</span>' : ''}</button>`).join('')}</div>` : ''}
         </div>
       </div>
+      ${!c.birth ? '<div class="card"><h3>🤰 孕期预览模式</h3><p class="note">显示 0 月龄内容供预习，出生后自动按宝宝月龄定位。</p></div>' : ''}
       <div class="card"><h3>${esc(sec.title)}</h3></div>
       ${fnHTML}
       ${guideFn === 'sleep' && band ? `<div class="card"><h3>睡眠参考（${band.age}）</h3><p>总量 ${band.total} · 小睡 ${band.naps} · 夜间 ${band.night}<br><span class="note">清醒间隔约 ${band.wake}</span></p></div>` : ''}
@@ -662,7 +831,7 @@ SD.views = (() => {
   }
 
   function foodObs(el) {
-    const mo = SD.time.ageParts(child().birth).totalMo
+    const mo = moOf(child())
     const foods = SD.store.recordsOf().filter(r => r.type === 'food').slice(-8).reverse()
     const stage = Object.values(SD.DATA.feed.food).find(f => mo >= f.rng[0] && mo <= f.rng[1])
     el.innerHTML = `
@@ -802,6 +971,7 @@ SD.views = (() => {
   }
 
   function tempTab(el) {
+    if (!child().birth) { el.innerHTML = '<div class="card"><h3>🌡️ 出生后启用</h3><p class="note">体温分级按月龄判断（<3 月龄发热即急症）。</p></div>'; return }
     const mo = SD.time.ageParts(child().birth).totalMo
     const temps = SD.store.recordsOf().filter(r => r.type === 'temp').slice(-12).reverse()
     el.innerHTML = `
@@ -992,6 +1162,7 @@ SD.views = (() => {
 
   function cardBody(el) {
     if (!child()) return onboard(el)
+    if (!child().birth) { el.innerHTML = bornGuard(); return }
     const c = child(), p = SD.time.ageParts(c.birth)
     const s = SD.summary.summarizeDay(SD.store.recordsOf(), SD.time.todayStr())
     const next = SD.vaccine.nextVaccine(c.birth, SD.store.vaccineDone())
@@ -1121,14 +1292,21 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
 
   /* ══════════ ⚙️ 设置（顶栏齿轮进入） ══════════ */
   /* 添加宝宝弹窗（设置页与顶栏下拉共用） */
+  let amMode = 'born'
   function openAddModal(after) {
     closeAddModal()
     const ov = document.createElement('div')
     ov.className = 'overlay' ; ov.id = 'add-modal'
     ov.innerHTML = `<div class="modal">
       <h3>添加宝宝</h3>
+      <div class="seg">
+        <button class="seg-btn ${amMode === 'born' ? 'on' : ''}" data-am="born">👶 已出生</button>
+        <button class="seg-btn ${amMode === 'wait' ? 'on' : ''}" data-am="wait">🤰 还没出生</button>
+      </div>
       <label class="field">小名</label><input type="text" id="am-name" placeholder="例如：小核桃">
-      <label class="field">出生日期</label><input type="date" id="am-birth">
+      ${amMode === 'born'
+        ? '<label class="field">出生日期</label><input type="date" id="am-birth">'
+        : '<label class="field">预产期</label><input type="date" id="am-due">'}
       <label class="field">性别</label><select id="am-gender"><option value="">保密</option><option value="m">男</option><option value="f">女</option></select>
       <p></p>
       <div class="row">
@@ -1138,15 +1316,25 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
     </div>`
     document.body.appendChild(ov)
     const birth = ov.querySelector('#am-birth')
-    birth.max = SD.time.todayStr()          // 生日不能晚于今天
+    if (birth) birth.max = SD.time.todayStr()          // 生日不能晚于今天
     ov.addEventListener('click', e => { if (e.target === ov) closeAddModal() })
     ov.querySelector('#am-cancel').addEventListener('click', closeAddModal)
+    ov.querySelectorAll('[data-am]').forEach(b => b.addEventListener('click', () => {
+      amMode = b.dataset.am; closeAddModal(); openAddModal(after)
+    }))
     ov.querySelector('#am-save').addEventListener('click', () => {
       const name = ov.querySelector('#am-name').value.trim()
-      const b = birth.value
-      if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(b)) return SD.ui.toast('小名与出生日期必填')
-      if (b > SD.time.todayStr()) return SD.ui.toast('出生日期不能晚于今天')
-      SD.store.addChild({ name, birth: b, gender: ov.querySelector('#am-gender').value })
+      if (!name) return SD.ui.toast('小名必填')
+      if (amMode === 'born') {
+        const b = ov.querySelector('#am-birth').value
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(b)) return SD.ui.toast('出生日期必填')
+        if (b > SD.time.todayStr()) return SD.ui.toast('出生日期不能晚于今天')
+        SD.store.addChild({ name, birth: b, gender: ov.querySelector('#am-gender').value })
+      } else {
+        const due = ov.querySelector('#am-due').value
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return SD.ui.toast('预产期必填')
+        SD.store.addChild({ name, due, gender: ov.querySelector('#am-gender').value })
+      }
       closeAddModal(); after && after()
     })
   }
@@ -1157,7 +1345,8 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
     el.innerHTML = `
       <div class="sec-title">宝宝档案（${st.children.length} 个）</div>
       ${st.children.map(c => `
-        <div class="tl-item"><span class="desc"><b>${esc(c.name)}</b> · ${esc(c.birth)} · ${({ m: '男', f: '女' }[c.gender] || '—')}</span>
+        <div class="tl-item"><span class="desc"><b>${esc(c.name)}</b> · ${c.birth ? esc(c.birth) : '预产期 ' + esc(c.due)} · ${({ m: '男', f: '女' }[c.gender] || '—')}</span>
+          ${!c.birth ? `<button class="btn ghost" data-born="${c.id}">🎉 出生了</button>` : ''}
           ${c.id === st.activeId ? '<span class="vac-badge done">当前</span>' : `<button class="btn ghost" data-sw="${c.id}">切换</button>`}
           <button class="del" data-rm="${c.id}">✕</button></div>`).join('')}
       <p></p><button class="btn ghost" id="s-open-add">＋ 添加宝宝</button>
@@ -1180,6 +1369,24 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
       setTimeout(() => openAddModal(() => SD.app.render()), 50)
     }
     el.querySelectorAll('[data-sw]').forEach(b => b.addEventListener('click', () => { SD.store.switchChild(b.dataset.sw); settings(el); SD.app.render() }))
+    // 出生转正：补生日，孕期记录自动归档
+    el.querySelectorAll('[data-born]').forEach(b => b.addEventListener('click', () => {
+      const id = b.dataset.born
+      document.getElementById('born-modal')?.remove()
+      const ov = document.createElement('div')
+      ov.className = 'overlay'; ov.id = 'born-modal'
+      ov.innerHTML = `<div class="modal"><h3>🎉 恭喜！宝宝出生了</h3>
+        <label class="field">出生日期</label><input type="date" id="b-date">
+        <p class="note">保存后自动切换到育儿模式；孕期记录（产检/体重）原样保留可回看。</p>
+        <p></p><div class="row"><button class="btn ghost" id="b-cancel">取消</button><button class="btn" id="b-save">转正</button></div></div>`
+      document.body.appendChild(ov)
+      const d = ov.querySelector('#b-date'); d.max = SD.time.todayStr(); d.value = SD.time.todayStr()
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+      ov.querySelector('#b-cancel').addEventListener('click', () => ov.remove())
+      ov.querySelector('#b-save').addEventListener('click', () => {
+        if (SD.store.registerBirth(id, d.value)) { ov.remove(); SD.ui.toast('欢迎来到世界！'); location.hash = '#home'; SD.app.render() }
+      })
+    }))
     el.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
       const c = st.children.find(x => x.id === b.dataset.rm)
       SD.ui.confirm(`删除「${c.name}」的全部记录？\n不可恢复，建议先导出备份`, () => { SD.store.removeChild(b.dataset.rm); settings(el) }, { danger: true, okText: '删除' })
