@@ -5,3 +5,4 @@ docs/STRATEGY.md
 
 node_modules/
 *.log
+.idea/
