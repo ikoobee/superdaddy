@@ -6,3 +6,6 @@ docs/STRATEGY.md
 node_modules/
 *.log
 .idea/
+CLAUDE.md
+google*.html
+tools/
