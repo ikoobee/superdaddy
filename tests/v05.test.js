@@ -79,3 +79,24 @@ describe('time: fmtAgo（A3 备份提醒）', () => {
     assert.equal(SD.time.fmtAgo(null, NOW), null);
   });
 });
+
+describe('data: 照护技巧与急救卡（care）', () => {
+  it('急救卡：识别+五步法+免责齐全', () => {
+    const FA = SD.DATA.care.firstaid;
+    assert.ok(FA.identify && FA.dial === '120');
+    assert.ok(FA.steps.length >= 5, '拍背压胸应有完整步骤');
+    assert.match(FA.note, /培训/);
+  });
+  it('摇晃警告存在且含冷静出口', () => {
+    assert.ok(SD.DATA.care.shake.body.includes('摇晃综合征'));
+    assert.ok(SD.DATA.care.shake.outlet.length > 10);
+  });
+  it('六类照护技巧：步骤≥3 且均带红旗', () => {
+    const tips = SD.DATA.care.tips;
+    assert.ok(tips.length >= 6);
+    for (const t of tips) {
+      assert.ok(t.body.length >= 3, `${t.key} 步骤不足`);
+      assert.ok(t.red.length >= 1, `${t.key} 缺红旗`);
+    }
+  });
+});

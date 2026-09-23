@@ -1014,7 +1014,32 @@ SD.views = (() => {
   }
 
   function healthTab(el) {
+    const FA = SD.DATA.care.firstaid
     el.innerHTML = `
+      <div class="card redcard fa-card">
+        <h3>🚨 ${FA.title}</h3>
+        <p><b>识别：</b>${FA.identify}</p>
+        <p class="note">${FA.canCough}</p>
+        <p><b>婴儿拍背压胸法（<1 岁）：</b></p>
+        <ol class="fa-steps">${FA.steps.map(x => `<li>${x}</li>`).join('')}</ol>
+        <p style="margin:10px 0 4px"><a class="btn danger2" href="tel:${FA.dial}" style="text-decoration:none;display:inline-block">📞 拨打 ${FA.dial}</a></p>
+        <p class="note">${FA.note}</p>
+      </div>
+      <div class="card redcard">
+        <h3>${SD.DATA.care.shake.title}</h3>
+        <p>${SD.DATA.care.shake.body}</p>
+        <p class="note">💪 ${SD.DATA.care.shake.outlet}</p>
+      </div>
+      <details class="card fold"><summary><b>🧤 常用照护技巧</b><span class="note">拍嗝 · 溢奶鉴别 · 抱姿 · 哄睡 · 脐部 · 红屁屁</span></summary>
+        <div style="margin-top:8px">
+        ${SD.DATA.care.tips.map(t => `
+          <details class="card"><summary>${t.icon} <b>${t.title}</b></summary>
+            <ul class="list" style="margin-top:8px">${t.body.map(x => `<li>${x}</li>`).join('')}</ul>
+            <p class="note" style="color:var(--danger)">⚠️ 红旗：${t.red.map(x => x).join('；')}</p>
+          </details>`).join('')}
+        </div>
+      </details>
+      <div class="sec-title">常见病自查</div>
       ${SD.DATA.health.diseases.map(d => `
         <details class="card"><summary>${d.ic} <b>${esc(d.nm)}</b> · ${esc(d.sym)}</summary>
           <p><b>护理：</b></p><ul class="list">${d.care.map(x => `<li>${esc(x)}</li>`).join('')}</ul>

@@ -1,5 +1,5 @@
 /* Service Worker —— cache-first，仅部署版生效（https） */
-const CACHE = 'superdaddy-v0.5'
+const CACHE = 'superdaddy-v0.6'
 const CORE = [
   './', 'index.html',
   'styles/tokens.css', 'styles/app.css',
@@ -9,7 +9,7 @@ const CORE = [
   'src/data/vaccine.data.js', 'src/data/who.data.js', 'src/data/guide.data.js',
   'src/data/feed.data.js', 'src/data/epds.data.js', 'src/data/bf_med.data.js',
   'src/data/health.data.js', 'src/data/mom.data.js', 'src/data/milestone.data.js',
-  'src/data/sleep_ref.data.js', 'src/data/day42.data.js', 'src/data/bag.data.js',
+  'src/data/sleep_ref.data.js', 'src/data/day42.data.js', 'src/data/bag.data.js', 'src/data/care.data.js',
   'manifest.webmanifest', 'icons/icon.svg',
 ]
 

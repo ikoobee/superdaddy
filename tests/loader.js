@@ -19,7 +19,7 @@ export function loadSD() {
     'src/utils/growth.js',
     'src/utils/features.js',
     'src/utils/trends.js',
-    'src/data/day42.data.js', 'src/data/bag.data.js',
+    'src/data/day42.data.js', 'src/data/bag.data.js', 'src/data/care.data.js',
     'src/utils/tasks.js',
     'src/utils/cal.js',
     'src/utils/preg.js',
