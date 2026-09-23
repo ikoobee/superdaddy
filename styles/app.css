@@ -428,3 +428,14 @@ details.fold > summary .note { flex: 1; text-align: right; overflow: hidden; tex
   animation: noise-pulse 2.2s ease-in-out infinite; padding: 0 2px;
 }
 @keyframes noise-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .45 } }
+
+/* 哄睡声音网格（9 种） */
+.noise-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: var(--space-3) 0 var(--space-1); }
+.noise-cell {
+  border: 1px solid var(--gray-300); background: var(--surface); color: var(--gray-800);
+  border-radius: var(--radius-md); padding: var(--space-3) var(--space-1);
+  font-size: .875rem; cursor: pointer; font-family: var(--font-body); text-align: center;
+}
+.noise-cell.on { background: var(--primary-500); border-color: var(--primary-500); color: #fff; font-weight: 600; }
+.noise-cell:disabled { opacity: .55; cursor: default; }
+.noise-cell:not(:disabled):not(.on):active { border-color: var(--primary-300); }
