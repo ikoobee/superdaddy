@@ -68,6 +68,8 @@ SD.store = (() => {
     cycleTaskPri(id) { SD.state.tasks = SD.tasks.cyclePri(SD.state.tasks, id); save() },
     clearDoneTasks() { SD.state.tasks = SD.tasks.clearDone(SD.state.tasks); save() },
     removeTask(id) { SD.state.tasks = SD.state.tasks.filter(t => t.id !== id); save() },
+    /** A3：记录最近一次备份时间（随状态持久） */
+    markBackup() { SD.state.lastBackup = new Date().toISOString(); save() },
     exportJSON() {
       return JSON.stringify({ app: 'superdaddy', version: 2, exportedAt: new Date().toISOString(), data: SD.state }, null, 2)
     },

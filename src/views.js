@@ -4,6 +4,15 @@ SD.views = (() => {
   const back = '<p><a href="#home" class="backlink">← 返回首页</a></p>'
   const child = () => SD.store.child
   const moOf = c => (c && c.birth) ? SD.time.ageParts(c.birth).totalMo : 0
+  const backupBanner = () => {
+    if (sessionStorage.getItem('sd-bk-off') === '1') return ''
+    const hasData = SD.state.records.length > 0 || SD.state.children.length > 0
+    if (!hasData) return ''
+    const last = SD.state.lastBackup
+    const days = last ? Math.floor((Date.now() - new Date(last).getTime()) / 86400000) : Infinity
+    if (days <= 7) return ''
+    return `<a class="card linkcard" href="#settings" id="bk-banner"><h3>💾 ${last ? '已 ' + days + ' 天未备份' : '还没有备份过'}</h3><p class="note">数据只存在本设备——去「设置 → 导出备份」一键保存 JSON</p></a>`
+  }
   const bornGuard = el => `<div class="card"><h3>👶 出生后解锁</h3><p class="note">这一页用到宝宝生日（疫苗/生长/月龄计算）。</p></div><a class="card linkcard" href="#bag"><h3>🎒 先去准备待产包</h3></a><a class="card linkcard" href="#day42"><h3>📖 预习 42 天月子餐</h3></a>`
 
   /* 分段条：attr=dataset 键，items=[[seg,label]]，cur=当前段 */
@@ -30,6 +39,7 @@ SD.views = (() => {
     const tempWarn = temps.length ? SD.features.tempStatus(p.totalMo, temps[temps.length - 1].val) : null
 
     el.innerHTML = `
+      ${backupBanner()}
       ${tempWarn && tempWarn !== 'ok' ? `<div class="card"><h3>${tempWarn === 'urgent' ? '🔴 <3月龄发热≥38℃：立即就医' : tempWarn === 'high' ? '🟠 高热 ≥38.5℃' : '🟡 低热'}</h3><p class="note">今日体温 ${temps[temps.length - 1].val}℃——见「育儿 · 护理」处理建议</p></div>` : ''}
       <div class="stat-grid">
         <div class="stat"><div class="k">今日喂奶</div><div class="v">${s.feedCount} 次${s.feedMl ? ` · ${s.feedMl}ml` : ''}</div></div>
@@ -70,6 +80,7 @@ SD.views = (() => {
     const bagDone = recs.filter(r => r.type === 'bag').length
     const bagTotal = SD.DATA.bag.cats.reduce((a, x) => a + x.items.length, 0)
     el.innerHTML = `
+      ${backupBanner()}
       <div class="hero-age">
         <div class="days">孕 ${preg.week}<small style="font-size:1.3rem">周+${preg.day}</small></div>
         <div class="sub">距预产期 ${preg.daysLeft} 天 · ${esc(c.name)} · ${c.due}</div>
@@ -90,6 +101,8 @@ SD.views = (() => {
   function pregnancyBody(el) {
     const c = child(), preg = SD.preg.pregParts(c.due)
     const recs = SD.store.recordsOf()
+    // A2 恢复近 1 小时宫缩记录（刷新/切页不丢）
+    ct = { start: null, marks: recs.filter(r => r.type === 'ctmark' && r.t >= Date.now() - 3600e3).sort((a, b) => a.t - b.t) }
     const checkups = recs.filter(r => r.type === 'checkup').slice(-6).reverse()
     const weights = recs.filter(r => r.type === 'pweight').slice(-8).reverse()
     el.innerHTML = `
@@ -194,6 +207,7 @@ SD.views = (() => {
         const last = ct.marks[ct.marks.length - 1]
         const gap = last ? Math.round((ct.start - last.t) / 60000) : 0
         ct.marks.push({ t: ct.start, dur, gap })
+        SD.store.addRecord({ type: 'ctmark', date: SD.time.todayStr(), time: SD.time.nowTime(), t: ct.start, dur, gap })
         ct.start = null; ctBtn.textContent = '▶ 宫缩开始'; ctBtn.classList.remove('rec')
         ctState.textContent = '已记录，继续观察下一次'
         renderCt()
@@ -349,7 +363,7 @@ SD.views = (() => {
   function feed(el) {
     if (!child()) return onboard(el)
     // 待产包/42天清单等勾选类不进时间轴
-    const recs = SD.store.recordsOf().filter(r => !['bag', 'd42'].includes(r.type))
+    const recs = SD.store.recordsOf().filter(r => !['bag', 'd42', 'ctmark'].includes(r.type))
     const days = [...new Set(recs.map(r => r.date))].sort().reverse().slice(0, 5)
     el.innerHTML = days.length
       ? days.map(d => `<div class="sec-title">${d}</div>` + recs.filter(r => r.date === d).slice().reverse().map(r => `
@@ -1255,12 +1269,12 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
       autoStopMin = +b.dataset.min
       if (noiseNode) {
         if (noiseStopTimer) clearTimeout(noiseStopTimer)
-        if (autoStopMin) noiseStopTimer = setTimeout(() => { stopNoise(); sound(el) }, autoStopMin * 60000)
+        if (autoStopMin) noiseStopTimer = setTimeout(() => { stopNoise(); SD.noiseCtrl.refresh() }, autoStopMin * 60000)
       }
       sound(el)
     }))
     el.querySelector('#n-toggle').addEventListener('click', () => {
-      if (noiseNode) { stopNoise(); sound(el); return }
+      if (noiseNode) { stopNoise(); sound(el); SD.noiseCtrl.refresh(); return }
       audioCtx = new (window.AudioContext || window.webkitAudioContext)()
       const kind = noiseKind
       if (kind === 'heart') {
@@ -1284,10 +1298,10 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
         src.start()
         noiseNode = src
       }
-      if (autoStopMin) noiseStopTimer = setTimeout(() => { stopNoise(); sound(el) }, autoStopMin * 60000)
+      if (autoStopMin) noiseStopTimer = setTimeout(() => { stopNoise(); SD.noiseCtrl.refresh() }, autoStopMin * 60000)
       sound(el)
     })
-    window.addEventListener('hashchange', stopNoise, { once: true })
+    SD.noiseCtrl.refresh()
   }
 
   /* ══════════ ⚙️ 设置（顶栏齿轮进入） ══════════ */
@@ -1352,7 +1366,7 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
       <p></p><button class="btn ghost" id="s-open-add">＋ 添加宝宝</button>
       <div class="sec-title">数据主权（核心承诺）</div>
       <div class="card">
-        <p class="note">所有数据只存在这台设备的浏览器里，零上传。请定期导出备份。</p>
+        <p class="note">所有数据只存在这台设备的浏览器里，零上传。上次备份：<b>${SD.state.lastBackup ? SD.time.fmtAgo(SD.state.lastBackup) : '从未'}</b>——请定期导出。</p>
         <p></p><button class="btn" id="s-export">导出备份 JSON</button>
         <p></p><label class="field">从备份恢复</label><input type="file" id="s-import" accept=".json">
         <p></p><button class="btn danger" id="s-clear">清空全部数据</button>
@@ -1396,6 +1410,7 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob); a.download = `superdaddy-backup-${SD.time.todayStr()}.json`
       a.click(); URL.revokeObjectURL(a.href)
+      SD.store.markBackup(); settings(el)
     })
     el.querySelector('#s-import').addEventListener('change', e => {
       const f = e.target.files[0]; if (!f) return
@@ -1408,6 +1423,16 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
         SD.store.clearAll(); location.hash = '#home'
       }, { danger: true, okText: '全部清空' })
     })
+  }
+
+  /* 顶栏白噪音指示器（后台播放时显示 ♪，点击停止） */
+  SD.noiseCtrl = {
+    active: () => !!noiseNode,
+    stop: () => { stopNoise(); SD.noiseCtrl.refresh() },
+    refresh() {
+      const ind = document.getElementById('noise-ind')
+      if (ind) ind.hidden = !noiseNode
+    },
   }
 
   return { home, feed, growth, guide, family, sound, settings, feedform: feedForm, sleepform: sleepForm }

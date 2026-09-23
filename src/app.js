@@ -48,6 +48,7 @@ SD.app = (() => {
     document.getElementById('back-btn').hidden = TABS.includes(view)
 
     updateChip()
+    if (SD.noiseCtrl) SD.noiseCtrl.refresh()
     SD.views[view](el)
     if (view !== 'growth') { delete el.dataset.gseg; delete el.dataset.metric }
     if (view !== 'guide') { delete el.dataset.useg; delete el.dataset.birthsub }
@@ -58,6 +59,10 @@ SD.app = (() => {
     SD.store.load()
     window.addEventListener('hashchange', render)
     document.getElementById('back-btn').addEventListener('click', () => (location.hash = '#home'))
+    // 顶栏白噪音指示器：后台播放中显示 ♪，点击停止
+    document.getElementById('noise-ind')?.addEventListener('click', () => {
+      SD.noiseCtrl && SD.noiseCtrl.stop()
+    })
     // 顶栏 chip：点击弹出下拉（切换宝宝 / 添加宝宝）
     document.getElementById('age-chip').addEventListener('click', e => {
       e.stopPropagation()

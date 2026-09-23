@@ -27,6 +27,12 @@ SD.time = {
     const m = Math.floor(sec / 60), s = sec % 60
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   },
+  /** A3：'今天' / 'X 天前'（空返回 null 由调用方显示「从未」） */
+  fmtAgo(iso, now) {
+    if (!iso) return null
+    const d = Math.floor(((now || Date.now()) - new Date(iso).getTime()) / 86400000)
+    return d < 1 ? '今天' : d + ' 天前'
+  },
   clockMinutes(sec) {
     return Math.round(sec / 60)
   },

@@ -70,3 +70,12 @@ describe('preg: 宫缩 5-1-1 判定（近 1 小时）', () => {
     assert.equal(r.level, 'go');
   });
 });
+
+describe('time: fmtAgo（A3 备份提醒）', () => {
+  const NOW = new Date('2026-09-23T12:00:00').getTime()
+  it('今天 / N 天前 / 从未', () => {
+    assert.equal(SD.time.fmtAgo('2026-09-23T08:00:00', NOW), '今天');
+    assert.equal(SD.time.fmtAgo('2026-09-16T12:00:00', NOW), '7 天前');
+    assert.equal(SD.time.fmtAgo(null, NOW), null);
+  });
+});
