@@ -6,7 +6,7 @@ SD.app = (() => {
     vaccine: ['growth', 'vac'], diary: ['growth', 'ms'], calendar: ['growth', 'cal'],
     food: ['guide', 'food'], supp: ['guide', 'food'], mom: ['guide', 'care'], health: ['guide', 'care'],
     day42: ['guide', 'birth', 'd42'], bag: ['guide', 'birth', 'bag'],
-    temp: ['growth', 'temp'],
+    temp: ['feed', null],   // 体温记录由时间轴承载
     help: ['settings', null], task: ['family', 'task'], card: ['family', 'card'],
   }
   const SEG_KEY = { growth: 'gseg', guide: 'useg', family: 'fseg' }
