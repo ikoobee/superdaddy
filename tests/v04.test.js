@@ -112,7 +112,7 @@ describe('features: 42 天月子餐定位', () => {
   it('结构与红线齐全', () => {
     for (const s of SD.DATA.day42.stages) {
       assert.ok(s.label && s.focus, `阶段 ${s.key} 说明不足`)
-      assert.equal(SD.DATA.day42.menus[s.key].length, 3, `阶段 ${s.key} 应有 3 套轮换菜单`)
+      assert.ok(SD.DATA.day42.menus[s.key].length >= 6, `阶段 ${s.key} 应 ≥6 套轮换菜单`)
     }
     assert.ok(SD.DATA.day42.care.length >= 3 && SD.DATA.day42.red.length >= 3, '护理要点与红线不足')
     assert.ok(SD.DATA.day42.checklist.length >= 6, '42 天检查清单应含母婴两侧');
