@@ -100,3 +100,18 @@ describe('data: 照护技巧与急救卡（care）', () => {
     }
   });
 });
+
+describe('features: 42 天多套菜单与跳过', () => {
+  it('每阶段 ≥6 套菜单', () => {
+    for (const s of SD.DATA.day42.stages) {
+      assert.ok(SD.DATA.day42.menus[s.key].length >= 6, `阶段 ${s.key} 应 ≥6 套`);
+    }
+  });
+  it('offset 跳过轮换正确', () => {
+    const a = SD.features.day42Day(8, 0);
+    const b = SD.features.day42Day(8, 1);
+    assert.notEqual(a.menu.b, b.menu.b);
+    assert.equal(a.total >= 6, true);
+    assert.equal(b.index, 1);
+  });
+});

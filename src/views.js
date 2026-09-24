@@ -712,12 +712,12 @@ SD.views = (() => {
 
   /* 42 天手册（原创整理；按日龄定位 + 检查清单打卡） */
   /* 42 天月子餐：天粒度下拉（同指南月份下拉样式）+ 每日菜单 */
-  let day42Sel = null, d42Open = false   // null = 跟随宝宝日龄
+  let day42Sel = null, d42Open = false, d42Offset = 0   // offset = 手动跳过菜单套数
   function day42Body(el) {
     const days = child() ? SD.time.ageParts(child().birth).days : null
     const curDay = Number.isFinite(days) ? Math.min(Math.max(days, 1), 42) : 1
     const selDay = day42Sel ?? curDay
-    const { stage, menu } = SD.features.day42Day(selDay)
+    const { stage, menu, total, index } = SD.features.day42Day(selDay, d42Offset)
     const doneSet = new Set(SD.store.recordsOf().filter(r => r.type === 'd42').map(r => r.key))
     const recs = SD.store.recordsOf()
     // d42 勾选走实时查询（见 bindD42List）
@@ -733,7 +733,8 @@ SD.views = (() => {
       </div>
       <div class="card"><h3>${stage.label}</h3><p class="note">${esc(stage.focus)}</p></div>
       <div class="card meal-card">
-        <h3>🍽 第 ${selDay} 天月子餐</h3>
+        <h3>🍽 第 ${selDay} 天月子餐 <span class="note">${index + 1}/${total} 套</span>
+          <button class="btn ghost" id="d42-swap" style="float:right;padding:2px 12px;font-size:.8125rem">换一套 →</button></h3>
         <div class="meal-row"><span class="mk">🌅 早餐</span><span>${esc(menu.b)}</span></div>
         <div class="meal-row"><span class="mk">☀️ 午餐</span><span>${esc(menu.l)}</span></div>
         <div class="meal-row"><span class="mk">🌙 晚餐</span><span>${esc(menu.d)}</span></div>
@@ -778,8 +779,9 @@ SD.views = (() => {
 
     el.querySelector('#d42-btn').addEventListener('click', e => { e.stopPropagation(); d42Open = !d42Open; day42Body(el) })
     el.querySelectorAll('[data-d42d]').forEach(b => b.addEventListener('click', e => {
-      e.stopPropagation(); d42Open = false; day42Sel = Number(b.dataset.d42d); day42Body(el)
+      e.stopPropagation(); d42Open = false; day42Sel = Number(b.dataset.d42d); d42Offset = 0; day42Body(el)
     }))
+    el.querySelector('#d42-swap')?.addEventListener('click', () => { d42Offset++; day42Body(el) })
   }
 
   /* 指南（对齐旧版双维度：月龄下拉 × 功能分段；喂养为特化富视图） */

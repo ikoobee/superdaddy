@@ -59,13 +59,13 @@ SD.features = (() => {
     },
 
     /** 42 天月子餐：按天数定位阶段与轮换菜单（1-42，越界钳制） */
-    day42Day(day) {
+    day42Day(day, offset = 0) {
       const d = Math.min(Math.max(Number(day) || 1, 1), 42)
       const stages = SD.DATA.day42.stages
       const stage = stages.find(s => d >= s.from && d <= s.to) || stages[stages.length - 1]
       const menus = SD.DATA.day42.menus[stage.key]
-      const menu = menus[(d - stage.from) % menus.length]
-      return { day: d, stage, menu }
+      const menu = menus[(d - stage.from + offset) % menus.length]
+      return { day: d, stage, menu, total: menus.length, index: (d - stage.from + offset) % menus.length }
     },
   }
 })()
