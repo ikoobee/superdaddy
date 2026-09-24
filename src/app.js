@@ -6,11 +6,12 @@ SD.app = (() => {
     vaccine: ['growth', 'vac'], diary: ['growth', 'ms'], calendar: ['growth', 'cal'],
     food: ['guide', 'food'], supp: ['guide', 'food'], mom: ['guide', 'care'], health: ['guide', 'care'],
     day42: ['guide', 'birth', 'd42'], bag: ['guide', 'birth', 'bag'],
+    temp: ['growth', 'temp'],
     help: ['settings', null], task: ['family', 'task'], card: ['family', 'card'],
   }
   const SEG_KEY = { growth: 'gseg', guide: 'useg', family: 'fseg' }
-  const STANDALONE = ['settings', 'sound', 'feed-form', 'sleep-form']
-  const VIEW_FN = { 'feed-form': 'feedform', 'sleep-form': 'sleepform' }
+  const STANDALONE = ['settings', 'sound', 'feed-form', 'sleep-form', 'temp-form']
+  const VIEW_FN = { 'feed-form': 'feedform', 'sleep-form': 'sleepform', 'temp-form': 'tempform' }
 
   function resolve() {
     const h = (location.hash || '#home').slice(1)

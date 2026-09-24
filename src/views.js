@@ -40,7 +40,7 @@ SD.views = (() => {
 
     el.innerHTML = `
       ${backupBanner()}
-      ${tempWarn && tempWarn !== 'ok' ? `<div class="card"><h3>${tempWarn === 'urgent' ? '🔴 <3月龄发热≥38℃：立即就医' : tempWarn === 'high' ? '🟠 高热 ≥38.5℃' : '🟡 低热'}</h3><p class="note">今日体温 ${temps[temps.length - 1].val}℃——见「育儿 · 护理」处理建议</p></div>` : ''}
+      ${tempWarn && tempWarn !== 'ok' ? `<div class="card"><h3>${tempWarn === 'urgent' ? '🔴 <3月龄发热≥38℃：立即就医' : tempWarn === 'high' ? '🟠 高热 ≥38.5℃' : '🟡 低热'}</h3><p class="note">今日体温 ${temps[temps.length - 1].val}℃——见「成长 · 体温」与急救常识</p></div>` : ''}
       <div class="stat-grid">
         <div class="stat"><div class="k">今日喂奶</div><div class="v">${s.feedCount} 次${s.feedMl ? ` · ${s.feedMl}ml` : ''}</div></div>
         <div class="stat"><div class="k">今日睡眠</div><div class="v">${(s.sleepMinutes / 60).toFixed(1)} 小时</div></div>
@@ -66,7 +66,7 @@ SD.views = (() => {
       const act = b.dataset.act
       if (act === 'feed') return (location.hash = '#feed-form')
       if (act === 'sleep') return (location.hash = '#sleep-form')
-      if (act === 'temp') return (location.hash = '#health')
+      if (act === 'temp') return (location.hash = '#temp-form')
       SD.store.addRecord({ type: act, date: SD.time.todayStr(), time: SD.time.nowTime() })
       b.classList.add('done-flash'); setTimeout(() => { b.classList.remove('done-flash'); home(el) }, 450)
     }))
@@ -328,6 +328,27 @@ SD.views = (() => {
     })
   }
 
+  /* 体温快速表单（喂奶同款模式：首页直达，保存跳成长·体温） */
+  function tempForm(el) {
+    if (!child() || !child().birth) { el.innerHTML = bornGuard(); return }
+    const mo = SD.time.ageParts(child().birth).totalMo
+    el.innerHTML = `<div class="sec-title">记录体温</div>
+      <div class="card">
+        <label class="field">时段</label><select id="tf-part"><option>晨起</option><option>午后</option><option>晚间</option></select>
+        <label class="field">体温 (℃)</label><input type="number" id="tf-val" step="0.1" min="34" max="43">
+        <p></p><button class="btn" id="tf-save">保存</button>
+      </div>`
+    el.querySelector('#tf-save').addEventListener('click', () => {
+      const v = +el.querySelector('#tf-val').value
+      if (!v || v < 34 || v > 43) return SD.ui.toast('请输入 34-43 之间的体温值')
+      SD.store.addRecord({ type: 'temp', date: SD.time.todayStr(), time: SD.time.nowTime(), part: el.querySelector('#tf-part').value, val: v })
+      const st = SD.features.tempStatus(mo, v)
+      if (st === 'urgent') SD.ui.toast('⚠️ 3 月龄内 ≥38℃：请立即就医', 'danger')
+      else if (st === 'high') SD.ui.toast('高热 ≥38.5℃，必要时就医', 'warn')
+      location.hash = '#temp'
+    })
+  }
+
   function sleepForm(el) {
     el.innerHTML = `<div class="sec-title">记录睡眠</div>
       <div class="card">
@@ -378,9 +399,9 @@ SD.views = (() => {
     if (!child()) return onboard(el)
     if (!child().birth) { el.innerHTML = bornGuard(); return }
     const seg = el.dataset.gseg || 'curve'
-    el.innerHTML = segBar('gseg', [['curve', '📈 曲线'], ['vac', '💉 疫苗'], ['ms', '🏆 里程碑'], ['cal', '📅 月历']], seg) + '<div id="seg-body"></div>'
+    el.innerHTML = segBar('gseg', [['curve', '📈 曲线'], ['vac', '💉 疫苗'], ['ms', '🏆 里程碑'], ['cal', '📅 月历'], ['temp', '🌡️ 体温']], seg) + '<div id="seg-body"></div>'
     const body = el.querySelector('#seg-body')
-    ;({ curve: renderCurve, vac: vaccine, ms: diary, cal: calendar })[seg](body)
+    ;({ curve: renderCurve, vac: vaccine, ms: diary, cal: calendar, temp: tempTab })[seg](body)
     bindSeg(el, 'gseg', () => growth(el))
   }
 
@@ -977,10 +998,10 @@ SD.views = (() => {
   /* 护理段：页内 Tab（体温 ｜ 宝宝健康 ｜ 妈妈） */
   function careBody(el) {
     if (!child()) return onboard(el)
-    const tab = el.dataset.crtab || 'temp'
-    el.innerHTML = segBar('crtab', [['temp', '🌡️ 体温'], ['health', '🏥 宝宝健康'], ['mom', '🤱 妈妈']], tab) + '<div id="seg-body2"></div>'
+    const tab = el.dataset.crtab === 'temp' ? 'health' : (el.dataset.crtab || 'health')   // 体温已迁成长；旧值兼容
+    el.innerHTML = segBar('crtab', [['health', '🏥 宝宝健康'], ['mom', '🤱 妈妈']], tab) + '<div id="seg-body2"></div>'
     const body = el.querySelector('#seg-body2')
-    ;({ temp: tempTab, health: healthTab, mom: momTab })[tab](body)
+    ;({ health: healthTab, mom: momTab })[tab](body)
     bindSeg(el, 'crtab', () => careBody(el))
   }
 
@@ -1544,5 +1565,5 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
     },
   }
 
-  return { home, feed, growth, guide, family, sound, settings, feedform: feedForm, sleepform: sleepForm }
+  return { home, feed, growth, guide, family, sound, settings, feedform: feedForm, sleepform: sleepForm, tempform: tempForm }
 })()
