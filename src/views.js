@@ -1028,7 +1028,7 @@ SD.views = (() => {
       else SD.store.addRecord({ type: k, date: SD.time.todayStr(), time: SD.time.nowTime() })
       suppForm(el)
     }))
-    el.querySelector('#supp-done').addEventListener('click', () => (location.hash = '#home'))
+    el.querySelector('#supp-done').addEventListener('click', () => (location.hash = '#feed'))
   }
 
   /* 护理段：页内 Tab（体温 ｜ 宝宝健康 ｜ 妈妈） */
