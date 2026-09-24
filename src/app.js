@@ -10,8 +10,8 @@ SD.app = (() => {
     help: ['settings', null], task: ['family', 'task'], card: ['family', 'card'],
   }
   const SEG_KEY = { growth: 'gseg', guide: 'useg', family: 'fseg' }
-  const STANDALONE = ['settings', 'sound', 'feed-form', 'sleep-form', 'temp-form']
-  const VIEW_FN = { 'feed-form': 'feedform', 'sleep-form': 'sleepform', 'temp-form': 'tempform' }
+  const STANDALONE = ['settings', 'sound', 'feed-form', 'sleep-form', 'temp-form', 'supp-form']
+  const VIEW_FN = { 'feed-form': 'feedform', 'sleep-form': 'sleepform', 'temp-form': 'tempform', 'supp-form': 'suppform' }
 
   function resolve() {
     const h = (location.hash || '#home').slice(1)

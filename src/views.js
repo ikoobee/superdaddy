@@ -37,6 +37,7 @@ SD.views = (() => {
     const overdue = vacList.filter(v => v.status === 'overdue')
     const temps = SD.store.recordsOf().filter(r => r.type === 'temp' && r.date === SD.time.todayStr())
     const tempWarn = temps.length ? SD.features.tempStatus(p.totalMo, temps[temps.length - 1].val) : null
+    const suppTaken = SUPPS.filter(x => SD.store.recordsOf().some(r => r.type === x.key && r.date === SD.time.todayStr())).length
 
     el.innerHTML = `
       ${backupBanner()}
@@ -45,7 +46,7 @@ SD.views = (() => {
         <div class="stat"><div class="k">今日喂奶</div><div class="v">${s.feedCount} 次${s.feedMl ? ` · ${s.feedMl}ml` : ''}</div></div>
         <div class="stat"><div class="k">今日睡眠</div><div class="v">${(s.sleepMinutes / 60).toFixed(1)} 小时</div></div>
         <div class="stat"><div class="k">尿 / 便</div><div class="v">${s.pee} / ${s.poop}</div></div>
-        <div class="stat"><div class="k">补剂</div><div class="v ${s.vitd ? 'done' : ''}">${s.vitd ? '✓ 已补' : '未补'}</div></div>
+        <div class="stat"><div class="k">补剂</div><div class="v ${suppTaken === SUPPS.length ? 'done' : ''}">${suppTaken}/${SUPPS.length}</div></div>
       </div>
       <div class="quick-row">
         <button class="quick-btn primary" data-act="feed">🍼 喂奶</button>
@@ -67,7 +68,7 @@ SD.views = (() => {
       if (act === 'feed') return (location.hash = '#feed-form')
       if (act === 'sleep') return (location.hash = '#sleep-form')
       if (act === 'temp') return (location.hash = '#temp-form')
-      if (act === 'vitd') return openSuppModal(el)
+      if (act === 'vitd') return (location.hash = '#supp-form')
       SD.store.addRecord({ type: act, date: SD.time.todayStr(), time: SD.time.nowTime() })
       b.classList.add('done-flash'); setTimeout(() => { b.classList.remove('done-flash'); home(el) }, 450)
     }))
@@ -996,39 +997,38 @@ SD.views = (() => {
     }))
   }
 
-  /* 补剂弹层（首页快捷直达，替代喂养页入口） */
-  function openSuppModal(el) {
-    document.getElementById('supp-modal')?.remove()
-    const ov = document.createElement('div')
-    ov.className = 'overlay'; ov.id = 'supp-modal'
+  /* 补剂页（喂奶同款：首页直达，打卡后返首页） */
+  function suppForm(el) {
+    if (!child()) return onboard(el)
     const recs = SD.store.recordsOf()
     const days = SD.trends.last7Days(recs, SD.time.todayStr())
-    ov.innerHTML = `<div class="modal">
-      <h3>💊 今日补剂</h3>
-      ${SUPPS.map(s => {
-        const taken = recs.some(r => r.type === s.key && r.date === SD.time.todayStr())
-        return `
+    const taken = SUPPS.filter(x => recs.some(r => r.type === x.key && r.date === SD.time.todayStr())).length
+    el.innerHTML = `<div class="sec-title">补剂打卡</div>
+      <div class="card">
+        <h3>💊 今日 ${taken}/${SUPPS.length}</h3>
+        ${SUPPS.map(s2 => {
+          const tk = recs.some(r => r.type === s2.key && r.date === SD.time.todayStr())
+          return `
         <div class="supp-row">
-          <span class="supp-name">${s.label}<i class="${taken ? 'on' : ''}">${taken ? '已补' : '未补'}</i></span>
-          <button class="supp-tap ${taken ? 'on' : ''}" data-supp="${s.key}">${taken ? '✓' : '＋'}</button>
+          <span class="supp-name">${s2.label}<i class="${tk ? 'on' : ''}">${tk ? '已补' : '未补'}</i></span>
+          <button class="supp-tap ${tk ? 'on' : ''}" data-supp="${s2.key}" title="${tk ? '点按撤销' : '点按打卡'}">${tk ? '✓' : '＋'}</button>
         </div>
         <div class="dots" style="margin:2px 0 8px">${days.map(d => {
-          const hit = recs.some(r => r.type === s.key && r.date === d.date)
+          const hit = recs.some(r => r.type === s2.key && r.date === d.date)
           return `<span class="dot ${hit ? 'on' : ''}" title="${d.date}">${d.date.slice(5)}</span>`
         }).join('')}</div>`
-      }).join('')}
-      <p class="note">${SUPPS.map(s => s.note).join('；')}——剂量遵医嘱。</p>
-      <div class="row"><button class="btn" id="supp-done">完成</button></div>
-    </div>`
-    document.body.appendChild(ov)
-    ov.querySelector('#supp-done').addEventListener('click', () => { ov.remove(); home(el) })
-    ov.querySelectorAll('[data-supp]').forEach(b => b.addEventListener('click', () => {
+        }).join('')}
+        <p class="note">${SUPPS.map(x => x.note).join('；')}——剂量遵医嘱。</p>
+        <p></p><button class="btn" id="supp-done">完成 · 返回首页</button>
+      </div>`
+    el.querySelectorAll('[data-supp]').forEach(b => b.addEventListener('click', () => {
       const k = b.dataset.supp
       const today = SD.store.recordsOf().find(r => r.type === k && r.date === SD.time.todayStr())
       if (today) SD.store.removeRecord(today.id)
       else SD.store.addRecord({ type: k, date: SD.time.todayStr(), time: SD.time.nowTime() })
-      openSuppModal(el)   // 重渲染弹层
+      suppForm(el)
     }))
+    el.querySelector('#supp-done').addEventListener('click', () => (location.hash = '#home'))
   }
 
   /* 护理段：页内 Tab（体温 ｜ 宝宝健康 ｜ 妈妈） */
@@ -1579,5 +1579,5 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
     },
   }
 
-  return { home, feed, growth, guide, family, sound, settings, feedform: feedForm, sleepform: sleepForm, tempform: tempForm }
+  return { home, feed, growth, guide, family, sound, settings, feedform: feedForm, sleepform: sleepForm, tempform: tempForm, suppform: suppForm }
 })()
