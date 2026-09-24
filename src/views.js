@@ -1019,7 +1019,7 @@ SD.views = (() => {
         }).join('')}</div>`
         }).join('')}
         <p class="note">${SUPPS.map(x => x.note).join('；')}——剂量遵医嘱。</p>
-        <p></p><button class="btn" id="supp-done">完成 · 返回首页</button>
+        <p></p><button class="btn" id="supp-done">保存并回首页</button>
       </div>`
     el.querySelectorAll('[data-supp]').forEach(b => b.addEventListener('click', () => {
       const k = b.dataset.supp
@@ -1028,7 +1028,7 @@ SD.views = (() => {
       else SD.store.addRecord({ type: k, date: SD.time.todayStr(), time: SD.time.nowTime() })
       suppForm(el)
     }))
-    el.querySelector('#supp-done').addEventListener('click', () => (location.hash = '#feed'))
+    el.querySelector('#supp-done').addEventListener('click', () => (location.hash = '#home'))
   }
 
   /* 护理段：页内 Tab（体温 ｜ 宝宝健康 ｜ 妈妈） */
