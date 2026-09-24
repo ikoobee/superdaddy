@@ -45,7 +45,7 @@ SD.views = (() => {
         <div class="stat"><div class="k">今日喂奶</div><div class="v">${s.feedCount} 次${s.feedMl ? ` · ${s.feedMl}ml` : ''}</div></div>
         <div class="stat"><div class="k">今日睡眠</div><div class="v">${(s.sleepMinutes / 60).toFixed(1)} 小时</div></div>
         <div class="stat"><div class="k">尿 / 便</div><div class="v">${s.pee} / ${s.poop}</div></div>
-        <div class="stat"><div class="k">维生素D</div><div class="v ${s.vitd ? 'done' : ''}">${s.vitd ? '✓ 已补' : '未补'}</div></div>
+        <div class="stat"><div class="k">补剂</div><div class="v ${s.vitd ? 'done' : ''}">${s.vitd ? '✓ 已补' : '未补'}</div></div>
       </div>
       <div class="quick-row">
         <button class="quick-btn primary" data-act="feed">🍼 喂奶</button>
@@ -53,7 +53,7 @@ SD.views = (() => {
         <button class="quick-btn" data-act="temp">🌡️ 体温</button>
         <button class="quick-btn" data-act="pee">💧 尿</button>
         <button class="quick-btn" data-act="poop">💩 便</button>
-        <button class="quick-btn" data-act="vitd">☀️ VD</button>
+        <button class="quick-btn" data-act="vitd">💊 补剂</button>
       </div>
       <div class="quick-row scene-row">
         <a class="quick-btn scene" href="#sound">🎧 哄睡白噪</a>
@@ -67,6 +67,7 @@ SD.views = (() => {
       if (act === 'feed') return (location.hash = '#feed-form')
       if (act === 'sleep') return (location.hash = '#sleep-form')
       if (act === 'temp') return (location.hash = '#temp-form')
+      if (act === 'vitd') return openSuppModal(el)
       SD.store.addRecord({ type: act, date: SD.time.todayStr(), time: SD.time.nowTime() })
       b.classList.add('done-flash'); setTimeout(() => { b.classList.remove('done-flash'); home(el) }, 450)
     }))
@@ -738,13 +739,13 @@ SD.views = (() => {
         <div class="meal-row"><span class="mk">🍵 加餐</span><span>${esc(menu.s)}</span></div>
         <p class="note" style="margin-top:8px">💡 ${esc(menu.tip)}</p>
       </div>
-      <details class="card fold"><summary><b>🤱 本阶段护理要点</b><span class="note">恶露 · 哺乳 · 情绪 · 活动</span></summary>
+      <details class="card fold" open><summary><b>🤱 本阶段护理要点</b><span class="note">恶露 · 哺乳 · 情绪 · 活动</span></summary>
         <ul class="list" style="margin-top:8px">${SD.DATA.day42.care.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
       </details>
-      <details class="card fold"><summary><b>🚨 红线预警</b><span class="note">出现即就医</span></summary>
+      <details class="card fold" open><summary><b>🚨 红线预警</b><span class="note">出现即就医</span></summary>
         <ul class="list" style="margin-top:8px">${SD.DATA.day42.red.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
       </details>
-      <details class="card fold"><summary><b>✅ 第 42 天检查清单</b><span class="note" id="d42-cnt">${doneSet.size}/${SD.DATA.day42.checklist.length} 已完成</span></summary>
+      <details class="card fold" open><summary><b>✅ 第 42 天检查清单</b><span class="note" id="d42-cnt">${doneSet.size}/${SD.DATA.day42.checklist.length} 已完成</span></summary>
         <div style="margin-top:8px" id="d42-list">${d42ListHTML()}</div>
       </details>
       <p class="note">${esc(SD.DATA.day42.note)}</p>`
@@ -859,9 +860,9 @@ SD.views = (() => {
   function foodBody(el) {
     if (!child()) return onboard(el)
     const tab = el.dataset.fdtab || 'obs'
-    el.innerHTML = segBar('fdtab', [['obs', '🥣 辅食观察'], ['alg', '🥛 过敏营养'], ['supp', '💊 补剂']], tab) + '<div id="seg-body2"></div>'
+    el.innerHTML = segBar('fdtab', [['obs', '🥣 辅食观察'], ['alg', '🥛 过敏营养']], tab) + '<div id="seg-body2"></div>'
     const body = el.querySelector('#seg-body2')
-    ;({ obs: foodObs, alg: foodAlg, supp: suppBody })[tab](body)
+    ;({ obs: foodObs, alg: foodAlg })[tab](body)
     bindSeg(el, 'fdtab', () => foodBody(el))
   }
 
@@ -995,6 +996,41 @@ SD.views = (() => {
     }))
   }
 
+  /* 补剂弹层（首页快捷直达，替代喂养页入口） */
+  function openSuppModal(el) {
+    document.getElementById('supp-modal')?.remove()
+    const ov = document.createElement('div')
+    ov.className = 'overlay'; ov.id = 'supp-modal'
+    const recs = SD.store.recordsOf()
+    const days = SD.trends.last7Days(recs, SD.time.todayStr())
+    ov.innerHTML = `<div class="modal">
+      <h3>💊 今日补剂</h3>
+      ${SUPPS.map(s => {
+        const taken = recs.some(r => r.type === s.key && r.date === SD.time.todayStr())
+        return `
+        <div class="supp-row">
+          <span class="supp-name">${s.label}<i class="${taken ? 'on' : ''}">${taken ? '已补' : '未补'}</i></span>
+          <button class="supp-tap ${taken ? 'on' : ''}" data-supp="${s.key}">${taken ? '✓' : '＋'}</button>
+        </div>
+        <div class="dots" style="margin:2px 0 8px">${days.map(d => {
+          const hit = recs.some(r => r.type === s.key && r.date === d.date)
+          return `<span class="dot ${hit ? 'on' : ''}" title="${d.date}">${d.date.slice(5)}</span>`
+        }).join('')}</div>`
+      }).join('')}
+      <p class="note">${SUPPS.map(s => s.note).join('；')}——剂量遵医嘱。</p>
+      <div class="row"><button class="btn" id="supp-done">完成</button></div>
+    </div>`
+    document.body.appendChild(ov)
+    ov.querySelector('#supp-done').addEventListener('click', () => { ov.remove(); home(el) })
+    ov.querySelectorAll('[data-supp]').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.supp
+      const today = SD.store.recordsOf().find(r => r.type === k && r.date === SD.time.todayStr())
+      if (today) SD.store.removeRecord(today.id)
+      else SD.store.addRecord({ type: k, date: SD.time.todayStr(), time: SD.time.nowTime() })
+      openSuppModal(el)   // 重渲染弹层
+    }))
+  }
+
   /* 护理段：页内 Tab（体温 ｜ 宝宝健康 ｜ 妈妈） */
   function careBody(el) {
     if (!child()) return onboard(el)
@@ -1065,11 +1101,18 @@ SD.views = (() => {
         <div id="med-out"></div>
         <p class="note">L1 最安全 → L5 禁用。以医生与说明书为准。</p>
       </div>
-      <div class="sec-title">产后恢复参考</div>
-      ${SD.DATA.mom.diet.map(w => `<details class="card"><summary><b>${esc(w.wk)}</b> · ${esc(w.goal)}</summary>
-        <p class="ok-list">✅ ${w.good.map(esc).join('；')}</p><p class="bad-list">❌ ${w.bad.map(esc).join('；')}</p></details>`).join('')}
-      ${SD.DATA.mom.wound.map(w => `<details class="card"><summary><b>${esc(w.t)}</b></summary><p>${w.care.map(esc).join('；')}</p></details>`).join('')}
-      <div class="card"><h3>身体恢复</h3>${SD.DATA.mom.recover.map(r => `<p>💪 <b>${esc(r[0])}</b>：${esc(r[1])}</p>`).join('')}</div>
+      <details class="card fold"><summary><b>🥣 产后月子餐参考</b><span class="note">按周 · 宜忌对照</span></summary>
+        <div style="margin-top:8px">
+        ${SD.DATA.mom.diet.map(w => `<details class="card"><summary><b>${esc(w.wk)}</b> · ${esc(w.goal)}</summary>
+          <p class="ok-list">✅ ${w.good.map(esc).join('；')}</p><p class="bad-list">❌ ${w.bad.map(esc).join('；')}</p></details>`).join('')}
+        </div>
+      </details>
+      <details class="card fold"><summary><b>🩹 伤口与恢复</b><span class="note">时间线 · 身体恢复</span></summary>
+        <div style="margin-top:8px">
+        ${SD.DATA.mom.wound.map(w => `<details class="card"><summary><b>${esc(w.t)}</b></summary><p>${w.care.map(esc).join('；')}</p></details>`).join('')}
+        <div class="card"><h3>💪 身体恢复</h3>${SD.DATA.mom.recover.map(r => `<p><b>${esc(r[0])}</b>：${esc(r[1])}</p>`).join('')}</div>
+        </div>
+      </details>
       <p class="note">仅供参考，不构成医疗建议；用药请遵医嘱与说明书。</p>`
   }
   function bindMom(scope) {
