@@ -43,13 +43,13 @@ SD.views = (() => {
       ${backupBanner()}
       ${tempWarn && tempWarn !== 'ok' ? `<div class="card"><h3>${tempWarn === 'urgent' ? '🔴 <3月龄发热≥38℃：立即就医' : tempWarn === 'high' ? '🟠 高热 ≥38.5℃' : '🟡 低热'}</h3><p class="note">今日体温 ${temps[temps.length - 1].val}℃——记录可回看；处理见「育儿 · 护理」</p></div>` : ''}
       <div class="stat-grid">
-        <div class="stat"><div class="k">今日喂奶</div><div class="v">${s.feedCount} 次${s.feedMl ? ` · ${s.feedMl}ml` : ''}</div></div>
+        <div class="stat"><div class="k">今日喂养</div><div class="v">${s.feedCount} 次${s.feedCount ? ` · 亲${s.nurseCount} 粉${s.formulaCount}` : ''}${s.formulaMl ? ` · ${s.formulaMl}ml` : ''}</div></div>
         <div class="stat"><div class="k">今日睡眠</div><div class="v">${(s.sleepMinutes / 60).toFixed(1)} 小时</div></div>
         <div class="stat"><div class="k">尿 / 便</div><div class="v">${s.pee} / ${s.poop}</div></div>
         <div class="stat"><div class="k">补剂</div><div class="v ${suppTaken === SUPPS.length ? 'done' : ''}">${suppTaken}/${SUPPS.length}</div></div>
       </div>
       <div class="quick-row">
-        <button class="quick-btn primary" data-act="feed">🍼 喂奶</button>
+        <button class="quick-btn primary" data-act="feed">🍼 喂养</button>
         <button class="quick-btn" data-act="sleep">😴 睡觉</button>
         <button class="quick-btn" data-act="temp">🌡️ 体温</button>
         <button class="quick-btn" data-act="pee">💧 尿</button>
@@ -255,36 +255,54 @@ SD.views = (() => {
     })
   }
 
-  /* ══════════ 喂奶 / 睡觉表单（真路由 #feed-form / #sleep-form） ══════════ */
+  /* ══════════ 喂养 / 睡觉表单（真路由 #feed-form / #sleep-form） ══════════ */
   function feedForm(el) {
-    el.innerHTML = `<div class="sec-title">记录喂奶</div>
+    el.innerHTML = `<div class="sec-title">记录喂养</div>
       <div class="card">
-        <div class="seg">
-          <button class="seg-btn on" data-mode="timer">⏱ 计时</button>
-          <button class="seg-btn" data-mode="manual">✍️ 手动</button>
+        <div class="seg" id="f-method-seg">
+          <button class="seg-btn on" data-method="nurse">🤱 亲喂</button>
+          <button class="seg-btn" data-method="formula">🍼 奶粉</button>
         </div>
-        <div id="f-timer">
-          <div class="seg" id="f-side-seg">
-            <button class="seg-btn on" data-side="L">左</button>
-            <button class="seg-btn" data-side="R">右</button>
-            <button class="seg-btn" data-side="B">双侧</button>
+        <div id="f-nurse">
+          <div class="seg">
+            <button class="seg-btn on" data-mode="timer">⏱ 计时</button>
+            <button class="seg-btn" data-mode="manual">✍️ 手动</button>
           </div>
-          <div class="timer-face" id="f-clock">00:00</div>
-          <button class="btn primary-big" id="f-go">▶ 开始喂奶</button>
-          <p class="note" id="f-note"></p>
+          <div id="f-timer">
+            <div class="seg" id="f-side-seg">
+              <button class="seg-btn on" data-side="L">左</button>
+              <button class="seg-btn" data-side="R">右</button>
+              <button class="seg-btn" data-side="B">双侧</button>
+            </div>
+            <div class="timer-face" id="f-clock">00:00</div>
+            <button class="btn primary-big" id="f-go">▶ 开始亲喂</button>
+            <p class="note" id="f-note"></p>
+          </div>
+          <div id="f-manual" hidden>
+            <label class="field">哪侧</label>
+            <select id="f-side"><option value="L">左</option><option value="R">右</option><option value="B">双侧</option></select>
+            <label class="field">时长（分钟）</label><input type="number" id="f-min" value="15" min="0" max="120">
+            <label class="field">时间</label><input type="time" id="f-time">
+            <p></p><button class="btn" id="f-save">保存</button>
+          </div>
         </div>
-        <div id="f-manual" hidden>
-          <label class="field">哪侧</label>
-          <select id="f-side"><option value="L">左</option><option value="R">右</option><option value="B">双侧</option></select>
-          <label class="field">时长（分钟）</label><input type="number" id="f-min" value="15" min="0" max="120">
-          <label class="field">瓶喂量（ml，亲喂填 0）</label><input type="number" id="f-ml" value="0" min="0" max="500">
-          <label class="field">时间</label><input type="time" id="f-time">
-          <p></p><button class="btn" id="f-save">保存</button>
+        <div id="f-formula" hidden>
+          <label class="field">奶量（ml）</label><input type="number" id="f-fml" value="120" min="1" max="500">
+          <label class="field">时间</label><input type="time" id="f-ftime">
+          <p></p><button class="btn" id="f-fsave">保存奶粉记录</button>
         </div>
       </div>`
 
     let side = 'L', running = false, startAt = 0, tick = null, seconds = 0
     el.querySelector('#f-time').value = SD.time.nowTime()
+    el.querySelector('#f-ftime').value = SD.time.nowTime()
+    el.querySelectorAll('#f-method-seg .seg-btn').forEach(b => b.addEventListener('click', () => {
+      if (running) return SD.ui.toast('计时中，请先停止或取消')
+      el.querySelectorAll('#f-method-seg .seg-btn').forEach(x => x.classList.remove('on')); b.classList.add('on')
+      const nurse = b.dataset.method === 'nurse'
+      el.querySelector('#f-nurse').hidden = !nurse
+      el.querySelector('#f-formula').hidden = nurse
+    }))
     el.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
       if (running) return SD.ui.toast('计时中，请先停止或取消')
       el.querySelectorAll('[data-mode]').forEach(x => x.classList.remove('on')); b.classList.add('on')
@@ -303,7 +321,7 @@ SD.views = (() => {
         running = true; startAt = Date.now(); seconds = 0
         btn.textContent = '⏹ 停止并记录'; btn.classList.add('rec')
         note.innerHTML = '计时中… <a href="#home" id="f-cancel">取消计时</a>'
-        el.querySelectorAll('#f-side-seg .seg-btn').forEach(x => (x.disabled = true))
+        el.querySelectorAll('#f-side-seg .seg-btn, #f-method-seg .seg-btn').forEach(x => (x.disabled = true))
         note.querySelector('#f-cancel').addEventListener('click', e => {
           e.preventDefault(); clearInterval(tick); location.hash = '#home'
         })
@@ -315,17 +333,24 @@ SD.views = (() => {
         clearInterval(tick)
         const mins = SD.time.clockMinutes(seconds)
         if (mins < 1) return SD.ui.toast('不足 1 分钟，未记录（点「取消计时」放弃）')
-        SD.store.addRecord({ type: 'feed', date: SD.time.todayStr(), time: SD.time.nowTime(), side, minutes: mins, ml: 0 })
+        SD.store.addRecord({ type: 'feed', method: 'nurse', date: SD.time.todayStr(), time: SD.time.nowTime(), side, minutes: mins })
         location.hash = '#feed'
       }
     })
     el.querySelector('#f-save').addEventListener('click', () => {
       SD.store.addRecord({
-        type: 'feed', date: SD.time.todayStr(),
+        type: 'feed', method: 'nurse', date: SD.time.todayStr(),
         time: el.querySelector('#f-time').value || SD.time.nowTime(),
         side: el.querySelector('#f-side').value,
-        minutes: +el.querySelector('#f-min').value || 0, ml: +el.querySelector('#f-ml').value || 0,
+        minutes: +el.querySelector('#f-min').value || 0,
       })
+      location.hash = '#feed'
+    })
+    el.querySelector('#f-fsave').addEventListener('click', () => {
+      const ml = +el.querySelector('#f-fml').value
+      if (!ml || ml < 1 || ml > 500) return SD.ui.toast('请输入 1-500 之间的奶量')
+      SD.store.addRecord({ type: 'feed', method: 'formula', date: SD.time.todayStr(), time: el.querySelector('#f-ftime').value || SD.time.nowTime(), ml })
+      SD.ui.toast(`已记录奶粉 ${ml}ml`)
       location.hash = '#feed'
     })
   }
@@ -367,9 +392,13 @@ SD.views = (() => {
   }
 
   /* ══════════ 📝 记录（时间轴） ══════════ */
-  const ICON = { feed: '🍼', sleep: '😴', pee: '💧', poop: '💩', vitd: '☀️', dha: '🐟', iron: '💊', temp: '🌡️', measure: '📏', food: '🥣', 'food-ok': '✅', 'food-react': '⚠️', diary: '📖', ms: '🏆', checkup: '🏥', pweight: '⚖️', kick: '👶', contraction: '⏱️' }
+  const ICON = { sleep: '😴', pee: '💧', poop: '💩', vitd: '☀️', dha: '🐟', iron: '💊', temp: '🌡️', measure: '📏', food: '🥣', 'food-ok': '✅', 'food-react': '⚠️', diary: '📖', ms: '🏆', checkup: '🏥', pweight: '⚖️', kick: '👶', contraction: '⏱️' }
+  /* 喂养图标按方式区分：亲喂 🤱 / 奶粉 🍼（旧记录按 feedMethod 推断） */
+  const iconOf = r => r.type === 'feed' ? (SD.summary.feedMethod(r) === 'nurse' ? '🤱' : '🍼') : (ICON[r.type] || '·')
   const LABEL = r => ({
-    feed: `喂奶（${({ L: '左', R: '右', B: '双侧' })[r.side] || ''}${r.minutes ? ' ' + r.minutes + 'min' : ''}${r.ml ? ' +' + r.ml + 'ml' : ''}）`,
+    feed: SD.summary.feedMethod(r) === 'nurse'
+      ? `亲喂（${({ L: '左', R: '右', B: '双侧' })[r.side] || ''}${r.minutes ? ' ' + r.minutes + 'min' : ''}）`
+      : `奶粉 ${r.ml || 0}ml`,
     sleep: `睡眠 ${r.start}–${r.end}`, pee: '尿尿', poop: '便便', vitd: '维生素D', dha: 'DHA', iron: '铁剂',
     temp: `体温 ${r.val}℃（${r.part || ''}）`,
     measure: `测量 身高${r.height || '-'}cm 体重${r.weight || '-'}kg${r.head ? ' 头围' + r.head + 'cm' : ''}`,
@@ -390,7 +419,7 @@ SD.views = (() => {
     const days = [...new Set(recs.map(r => r.date))].sort().reverse().slice(0, 5)
     el.innerHTML = days.length
       ? days.map(d => `<div class="sec-title">${d}</div>` + recs.filter(r => r.date === d).slice().reverse().map(r => `
-          <div class="tl-item"><span class="icon">${ICON[r.type] || '·'}</span><span class="desc">${esc(LABEL(r))}</span>
+          <div class="tl-item"><span class="icon">${iconOf(r)}</span><span class="desc">${esc(LABEL(r))}</span>
           <span class="t">${r.time || r.start || ''}</span><button class="del" data-id="${r.id}">✕</button></div>`).join('')).join('')
       : `<div class="empty"><p>还没有记录</p><p class="note">回首页用快捷按钮打卡</p></div>`
     el.querySelectorAll('.del').forEach(b => b.addEventListener('click', () => { SD.store.removeRecord(b.dataset.id); feed(el) }))
@@ -642,7 +671,7 @@ SD.views = (() => {
             ${dias.length ? `<p>📖 日记：${dias.map(r => esc(r.name)).join('；')}</p>` : ''}
             ${others.length ? (() => {
               const s = SD.summary.summarizeDay(recs, selDate)
-              return `<p class="note">记录：喂奶 ${s.feedCount} 次 · 睡眠 ${(s.sleepMinutes / 60).toFixed(1)}h · 尿 ${s.pee} · 便 ${s.poop}</p>`
+              return `<p class="note">记录：喂养 ${s.feedCount} 次（亲${s.nurseCount}·粉${s.formulaCount}） · 睡眠 ${(s.sleepMinutes / 60).toFixed(1)}h · 尿 ${s.pee} · 便 ${s.poop}</p>`
             })() : ''}
             ${!vacs.length && !dias.length && !mss.length && !others.length ? '<p class="note">当日暂无事项</p>' : ''}
           </div>`
@@ -1247,7 +1276,7 @@ SD.views = (() => {
     const text =
 `【${c.name}的今日交接卡】${SD.time.todayStr()}
 年龄：${SD.time.fmtAge(p)}（第 ${p.days} 天）
-今日喂奶：${s.feedCount} 次${s.feedMl ? `（瓶喂共 ${s.feedMl}ml）` : ''}
+今日喂养：共 ${s.feedCount} 次（亲喂 ${s.nurseCount} · 奶粉 ${s.formulaCount}${s.formulaMl ? ` · 奶粉共 ${s.formulaMl}ml` : ''}）
 今日睡眠：${(s.sleepMinutes / 60).toFixed(1)} 小时
 尿 ${s.pee} 次 / 便 ${s.poop} 次 / 维生素D ${s.vitd ? '已补' : '❗未补'}
 ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\n` : ''}${next ? `下一剂疫苗：${next.name} 第${next.dose}剂（${next.sched}）\n` : ''}

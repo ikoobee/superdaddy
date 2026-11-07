@@ -95,6 +95,25 @@ describe('summary: 今日汇总', () => {
     assert.equal(s.vitd, false);
   });
 
+  it('喂养分口径：新记录带 method 时按亲喂/奶粉分别计数', () => {
+    const s = summarizeDay([
+      { type: 'feed', date: '2026-09-15', time: '02:00', method: 'nurse',   side: 'L', minutes: 15 },
+      { type: 'feed', date: '2026-09-15', time: '05:00', method: 'formula', ml: 120 },
+      { type: 'feed', date: '2026-09-15', time: '08:00', method: 'formula', ml: 90 },
+    ], '2026-09-15');
+    assert.equal(s.feedCount, 3);
+    assert.equal(s.nurseCount, 1);
+    assert.equal(s.formulaCount, 2);
+    assert.equal(s.formulaMl, 210);
+  });
+
+  it('旧记录无 method：ml>0 推断为奶粉，否则亲喂', () => {
+    const s = summarizeDay(recs, '2026-09-15'); // 夹具两条今日 feed 均无 method：15min/0ml 与 12min/60ml
+    assert.equal(s.nurseCount, 1);
+    assert.equal(s.formulaCount, 1);
+    assert.equal(s.formulaMl, 60);
+  });
+
   it('跨午夜睡眠（start>end）计入当日', () => {
     const s = summarizeDay([
       { type: 'sleep', date: '2026-09-15', start: '23:00', end: '01:30' },
