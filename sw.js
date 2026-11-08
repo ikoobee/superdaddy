@@ -1,5 +1,5 @@
 /* Service Worker —— cache-first，仅部署版生效（https） */
-const CACHE = 'superdaddy-v0.8'
+const CACHE = 'superdaddy-v0.9'
 const CORE = [
   './', 'index.html',
   'styles/tokens.css', 'styles/app.css',

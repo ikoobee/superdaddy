@@ -38,12 +38,16 @@ SD.views = (() => {
     const temps = SD.store.recordsOf().filter(r => r.type === 'temp' && r.date === SD.time.todayStr())
     const tempWarn = temps.length ? SD.features.tempStatus(p.totalMo, temps[temps.length - 1].val) : null
     const suppTaken = SUPPS.filter(x => SD.store.recordsOf().some(r => r.type === x.key && r.date === SD.time.todayStr())).length
+    /* 喂养副行：方式拆分小字（图标与时间轴一致），主值保持与其他卡同量级 */
+    const feedSub = s.feedCount
+      ? [s.nurseCount ? `🤱${s.nurseCount}` : '', s.formulaCount ? `🍼${s.formulaCount}` : '', s.formulaMl ? `${s.formulaMl}ml` : ''].filter(Boolean).join(' · ')
+      : ''
 
     el.innerHTML = `
       ${backupBanner()}
       ${tempWarn && tempWarn !== 'ok' ? `<div class="card"><h3>${tempWarn === 'urgent' ? '🔴 <3月龄发热≥38℃：立即就医' : tempWarn === 'high' ? '🟠 高热 ≥38.5℃' : '🟡 低热'}</h3><p class="note">今日体温 ${temps[temps.length - 1].val}℃——记录可回看；处理见「育儿 · 护理」</p></div>` : ''}
       <div class="stat-grid">
-        <div class="stat"><div class="k">今日喂养</div><div class="v">${s.feedCount} 次${s.feedCount ? ` · 亲${s.nurseCount} 粉${s.formulaCount}` : ''}${s.formulaMl ? ` · ${s.formulaMl}ml` : ''}</div></div>
+        <div class="stat"><div class="k">今日喂养</div><div class="v">${s.feedCount} 次</div>${feedSub ? `<div class="sub">${feedSub}</div>` : ''}</div>
         <div class="stat"><div class="k">今日睡眠</div><div class="v">${(s.sleepMinutes / 60).toFixed(1)} 小时</div></div>
         <div class="stat"><div class="k">尿 / 便</div><div class="v">${s.pee} / ${s.poop}</div></div>
         <div class="stat"><div class="k">补剂</div><div class="v ${suppTaken === SUPPS.length ? 'done' : ''}">${suppTaken}/${SUPPS.length}</div></div>

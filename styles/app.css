@@ -88,6 +88,7 @@ main#view { padding: var(--space-4); }
 .stat .k { color: var(--gray-500); font-size: var(--text-sm); }
 .stat .v { font-size: var(--text-lg); font-weight: 600; color: var(--gray-900); }
 .stat .v.done { color: var(--ok); }
+.stat .sub { margin-top: 2px; color: var(--gray-500); font-size: var(--text-xs); }
 
 .quick-row { display: flex; gap: var(--space-2); margin: var(--space-6) 0 var(--space-4); flex-wrap: wrap; }
 .quick-btn {
