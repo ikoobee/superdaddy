@@ -36,23 +36,29 @@ SD.views = (() => {
     return `<h3>${mark} 下次喂养 ${t(fp.nextAt)} · 还有 ${fp.remainMin} 分钟</h3><p class="note">参考每次 ${fp.ref.perMl}ml · 间隔约 ${fp.ref.interval}h · 今日 ${fp.todayCount}/${fp.ref.times} 次</p>`
   }
   /* 全局 30s 心跳：卡内倒计时刷新 + 到时提示/通知（仅应用打开期间——本地优先无推送服务） */
-  let feedTick = null, feedToastAt = null
+  let feedTick = null, feedToastAt = null, feedVisArmed = false
+  function feedTickOnce() {
+    const c = SD.store.child
+    if (!c || !c.birth || !SD.state.feedRemind) return
+    const fp = SD.feedPlan.feedPlan(c.birth, Date.now(), SD.store.recordsOf())
+    const el = document.getElementById('feed-next-card')
+    if (el && el.isConnected) el.innerHTML = feedCardInner(fp)
+    if (fp.status === 'due' && fp.nextAt !== feedToastAt) {
+      feedToastAt = fp.nextAt
+      SD.ui.toast(`🍼 该喂奶啦 · 参考每次 ${fp.ref.perMl}ml（亲喂按需）`)
+      if (SD.state.feedNotify && 'Notification' in window && Notification.permission === 'granted') {
+        try { new Notification('该喂奶啦', { body: `距上次已 ${Math.round((Date.now() - fp.lastMs) / 60000)} 分钟 · 参考每次 ${fp.ref.perMl}ml`, tag: 'sd-feed' }) } catch { /* file:// 或权限拒绝时静默降级 */ }
+      }
+    }
+  }
   function armFeedTicker() {
     clearInterval(feedTick)
-    feedTick = setInterval(() => {
-      const c = SD.store.child
-      if (!c || !c.birth || !SD.state.feedRemind) return
-      const fp = SD.feedPlan.feedPlan(c.birth, Date.now(), SD.store.recordsOf())
-      const el = document.getElementById('feed-next-card')
-      if (el && el.isConnected) el.innerHTML = feedCardInner(fp)
-      if (fp.status === 'due' && fp.nextAt !== feedToastAt) {
-        feedToastAt = fp.nextAt
-        SD.ui.toast(`🍼 该喂奶啦 · 参考每次 ${fp.ref.perMl}ml（亲喂按需）`)
-        if (SD.state.feedNotify && 'Notification' in window && Notification.permission === 'granted') {
-          try { new Notification('该喂奶啦', { body: `距上次已 ${Math.round((Date.now() - fp.lastMs) / 60000)} 分钟 · 参考每次 ${fp.ref.perMl}ml`, tag: 'sd-feed' }) } catch { /* file:// 或权限拒绝时静默降级 */ }
-        }
-      }
-    }, 30000)
+    feedTick = setInterval(feedTickOnce, 30000)
+    /* 后台定时器被浏览器节流：回前台立即补一次刷新/到时检测（监听只挂一次） */
+    if (!feedVisArmed) {
+      feedVisArmed = true
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) feedTickOnce() })
+    }
   }
 
   /* ══════════ 🏠 首页（每日多次） ══════════ */
