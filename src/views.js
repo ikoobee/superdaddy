@@ -299,6 +299,8 @@ SD.views = (() => {
 
   /* ══════════ 喂养 / 睡觉表单（真路由 #feed-form / #sleep-form） ══════════ */
   function feedForm(el) {
+    /* 奶粉默认奶量按月龄预填（milkRef 与待喂养卡同源；未出生/无档案回落 120） */
+    const ref = (() => { const c = SD.store.child; return c && c.birth ? SD.features.milkRef(SD.time.ageParts(c.birth).totalMo) : null })()
     el.innerHTML = `<div class="sec-title">记录喂养</div>
       <div class="card">
         <div class="seg" id="f-method-seg">
@@ -329,7 +331,8 @@ SD.views = (() => {
           </div>
         </div>
         <div id="f-formula" hidden>
-          <label class="field">奶量（ml）</label><input type="number" id="f-fml" value="120" min="1" max="500">
+          <label class="field">奶量（ml）</label><input type="number" id="f-fml" value="${ref ? ref.perMl : 120}" min="1" max="500">
+          ${ref ? `<p class="note">月龄参考：每次约 ${ref.perMl}ml · 间隔约 ${ref.interval}h（可按需调整）</p>` : ''}
           <label class="field">时间</label><input type="time" id="f-ftime">
           <p></p><button class="btn" id="f-fsave">保存奶粉记录</button>
         </div>
