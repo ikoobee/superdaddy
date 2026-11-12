@@ -25,6 +25,36 @@ SD.views = (() => {
       b.addEventListener('click', () => { el.dataset[attr.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = b.dataset[attr]; rerender() }))
   }
 
+  /* ══════════ 🍼 待喂养提醒（BA6）：月龄参考表 → 下次喂养推算 ══════════ */
+  const feedCardInner = fp => {
+    const t = ms => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
+    if (fp.status === 'none')
+      return `<h3>🍼 待喂养提醒</h3><p class="note">记录第一次喂养后开始提醒 · 参考每次 ${fp.ref.perMl}ml / 间隔约 ${fp.ref.interval}h</p>`
+    if (fp.status === 'due')
+      return `<h3>🍼 该喂奶啦 · 已到时 ${-fp.remainMin} 分钟</h3><p class="note">参考每次 ${fp.ref.perMl}ml · 今日 ${fp.todayCount}/${fp.ref.times} 次 · 亲喂按需，奶粉参考间隔</p>`
+    const mark = fp.status === 'soon' ? '🟡' : '🍼'
+    return `<h3>${mark} 下次喂养 ${t(fp.nextAt)} · 还有 ${fp.remainMin} 分钟</h3><p class="note">参考每次 ${fp.ref.perMl}ml · 间隔约 ${fp.ref.interval}h · 今日 ${fp.todayCount}/${fp.ref.times} 次</p>`
+  }
+  /* 全局 30s 心跳：卡内倒计时刷新 + 到时提示/通知（仅应用打开期间——本地优先无推送服务） */
+  let feedTick = null, feedToastAt = null
+  function armFeedTicker() {
+    clearInterval(feedTick)
+    feedTick = setInterval(() => {
+      const c = SD.store.child
+      if (!c || !c.birth || !SD.state.feedRemind) return
+      const fp = SD.feedPlan.feedPlan(c.birth, Date.now(), SD.store.recordsOf())
+      const el = document.getElementById('feed-next-card')
+      if (el && el.isConnected) el.innerHTML = feedCardInner(fp)
+      if (fp.status === 'due' && fp.nextAt !== feedToastAt) {
+        feedToastAt = fp.nextAt
+        SD.ui.toast(`🍼 该喂奶啦 · 参考每次 ${fp.ref.perMl}ml（亲喂按需）`)
+        if (SD.state.feedNotify && 'Notification' in window && Notification.permission === 'granted') {
+          try { new Notification('该喂奶啦', { body: `距上次已 ${Math.round((Date.now() - fp.lastMs) / 60000)} 分钟 · 参考每次 ${fp.ref.perMl}ml`, tag: 'sd-feed' }) } catch { /* file:// 或权限拒绝时静默降级 */ }
+        }
+      }
+    }, 30000)
+  }
+
   /* ══════════ 🏠 首页（每日多次） ══════════ */
   function home(el) {
     if (!child()) return onboard(el)
@@ -52,6 +82,7 @@ SD.views = (() => {
         <div class="stat"><div class="k">尿 / 便</div><div class="v">${s.pee} / ${s.poop}</div></div>
         <div class="stat"><div class="k">补剂</div><div class="v ${suppTaken === SUPPS.length ? 'done' : ''}">${suppTaken}/${SUPPS.length}</div></div>
       </div>
+      ${SD.state.feedRemind ? `<a class="card linkcard" id="feed-next-card" href="#feed-form">${feedCardInner(SD.feedPlan.feedPlan(c.birth, Date.now(), SD.store.recordsOf()))}</a>` : ''}
       <div class="quick-row">
         <button class="quick-btn primary" data-act="feed">🍼 喂养</button>
         <button class="quick-btn" data-act="sleep">😴 睡觉</button>
@@ -76,6 +107,7 @@ SD.views = (() => {
       SD.store.addRecord({ type: act, date: SD.time.todayStr(), time: SD.time.nowTime() })
       b.classList.add('done-flash'); setTimeout(() => { b.classList.remove('done-flash'); home(el) }, 450)
     }))
+    armFeedTicker()
   }
 
   /* ══════════ 🤰 孕期首页与工具（未出生模式） ══════════ */
@@ -495,7 +527,7 @@ SD.views = (() => {
       })()}
       <details class="card fold">
         <summary><b>🧰 参考工具</b><span class="note">奶量参考 · 遗传靶身高</span></summary>
-        <div class="card" style="margin-top:8px"><h3>奶量参考（${mo} 月龄）</h3><p>${(() => { const r = SD.features.milkRef(mo); return `每日约 ${r.times} 次 · 每次 ${r.perMl}ml<br><span class="note">${esc(r.note)}</span>` })()}</p></div>
+        <div class="card" style="margin-top:8px"><h3>奶量参考（${mo} 月龄）</h3><p>${(() => { const r = SD.features.milkRef(mo); return `每日约 ${r.times} 次 · 每次 ${r.perMl}ml · 间隔约 ${r.interval} 小时<br><span class="note">${esc(r.note)} · 亲喂按需，奶粉参考间隔</span>` })()}</p></div>
         <div class="card">
           <h3>遗传靶身高</h3>
           <label class="field">爸爸身高 (cm)</label><input type="number" id="th-dad" value="175">
@@ -1543,6 +1575,13 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
           ${c.id === st.activeId ? '<span class="vac-badge done">当前</span>' : `<button class="btn ghost" data-sw="${c.id}">切换</button>`}
           <button class="del" data-rm="${c.id}">✕</button></div>`).join('')}
       <p></p><button class="btn ghost" id="s-open-add">＋ 添加宝宝</button>
+      <div class="sec-title">提醒</div>
+      <div class="card">
+        <label class="field" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="s-feedremind" ${st.feedRemind ? 'checked' : ''}> 待喂养提醒（首页倒计时卡 + 到时应用内提示）</label>
+        <p></p>
+        <label class="field" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="s-feednotify" ${st.feedNotify ? 'checked' : ''}> 到时浏览器通知<span class="note">（仅应用打开期间有效——本地优先，无推送服务）</span></label>
+        <p class="note">推荐量与间隔按月龄参考表自动更新：亲喂按需，奶粉参考间隔；提醒为育儿辅助参考，以宝宝实际饥饱信号为准。</p>
+      </div>
       <div class="sec-title">数据主权（核心承诺）</div>
       <div class="card">
         <p class="note">所有数据只存在这台设备的浏览器里，零上传。上次备份：<b>${SD.state.lastBackup ? SD.time.fmtAgo(SD.state.lastBackup) : '从未'}</b>——请定期导出。</p>
@@ -1556,6 +1595,16 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
 
     el.querySelector('#s-open-add').addEventListener('click', () =>
       openAddModal(() => { location.hash = '#settings'; SD.app.render() }))
+    el.querySelector('#s-feedremind').addEventListener('change', e => { SD.state.feedRemind = e.target.checked; SD.store.save() })
+    el.querySelector('#s-feednotify').addEventListener('change', e => {
+      const on = () => { SD.state.feedNotify = true; SD.store.save(); SD.ui.toast('到时通知已开启（仅应用打开期间）') }
+      const off = msg => { e.target.checked = false; SD.state.feedNotify = false; SD.store.save(); if (msg) SD.ui.toast(msg) }
+      if (!e.target.checked) return off()
+      if (!('Notification' in window)) return off('此环境不支持浏览器通知')
+      if (Notification.permission === 'granted') return on()
+      Notification.requestPermission().then(p => (p === 'granted' ? on() : off('浏览器未授权，通知保持关闭')))
+        .catch(() => off('通知权限请求失败（file:// 环境可能受限）'))
+    })
     helpBody(el.querySelector('#help-slot'))   // 使用指南内嵌（自育儿页迁入）
     if (sessionStorage.getItem('sd-open-add') === '1') {   // 顶栏下拉触发的添加
       sessionStorage.removeItem('sd-open-add')

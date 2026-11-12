@@ -21,6 +21,7 @@ export function loadSD() {
     'src/utils/trends.js',
     'src/data/day42.data.js', 'src/data/bag.data.js', 'src/data/care.data.js',
     'src/utils/tasks.js',
+    'src/utils/feedplan.js',
     'src/utils/cal.js',
     'src/utils/preg.js',
     'src/data/sleep_ref.data.js',
