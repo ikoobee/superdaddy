@@ -120,6 +120,11 @@ describe('summary: 今日汇总', () => {
     ], '2026-09-15');
     assert.equal(s.sleepMinutes, 150);
   });
+  it('sleepMin：常规 / 跨午夜 / 同时刻=0', () => {
+    assert.equal(SD.summary.sleepMin('12:00', '13:45'), 105);
+    assert.equal(SD.summary.sleepMin('23:00', '01:30'), 150); // 跨午夜按入睡日 +24h
+    assert.equal(SD.summary.sleepMin('09:00', '09:00'), 0);
+  });
 });
 
 describe('summary: 时间轴分组排序', () => {

@@ -5,18 +5,20 @@ const feedMethod = f => f.method || (Number(f.ml) > 0 ? 'formula' : 'nurse')
 SD.summary = {
   feedMethod,
 
+  /** 单段睡眠分钟数：跨午夜（end < start）按入睡日 +24h；同时刻 = 0 */
+  sleepMin(start, end) {
+    const toMin = hm => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m }
+    let e = toMin(end)
+    if (e < toMin(start)) e += 24 * 60
+    return e - toMin(start)
+  },
+
   summarizeDay(records, date) {
     const day = (records || []).filter(r => r.date === date)
     const feeds = day.filter(r => r.type === 'feed')
     const sleeps = day.filter(r => r.type === 'sleep')
 
-    const toMin = hm => { const [h, m] = hm.split(':').map(Number); return h * 60 + m }
-    let sleepMinutes = 0
-    for (const s of sleeps) {
-      let end = toMin(s.end)
-      if (end < toMin(s.start)) end += 24 * 60 // 跨午夜：按当日入睡计
-      sleepMinutes += end - toMin(s.start)
-    }
+    const sleepMinutes = sleeps.reduce((a, s) => a + SD.summary.sleepMin(s.start, s.end), 0)
 
     return {
       feedCount: feeds.length,

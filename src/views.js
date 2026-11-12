@@ -421,14 +421,61 @@ SD.views = (() => {
   function sleepForm(el) {
     el.innerHTML = `<div class="sec-title">记录睡眠</div>
       <div class="card">
-        <label class="field">入睡时间</label><input type="time" id="s-start">
-        <label class="field">醒来时间（跨午夜可小于入睡）</label><input type="time" id="s-end">
-        <p></p><button class="btn" id="s-save">保存</button>
+        <div class="seg">
+          <button class="seg-btn on" data-mode="timer">⏱ 计时</button>
+          <button class="seg-btn" data-mode="manual">✍️ 手动</button>
+        </div>
+        <div id="sl-timer">
+          <div class="timer-face" id="sl-clock">00:00</div>
+          <button class="btn primary-big" id="sl-go">🌙 开始睡觉</button>
+          <p class="note" id="sl-note"></p>
+        </div>
+        <div id="sl-manual" hidden>
+          <label class="field">入睡时间</label><input type="time" id="s-start">
+          <label class="field">醒来时间（跨午夜可小于入睡）</label><input type="time" id="s-end">
+          <p></p><button class="btn" id="s-save">保存</button>
+        </div>
       </div>`
+
+    let running = false, startAt = 0, tick = null, seconds = 0, startStr = '', startDate = ''
+    el.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+      if (running) return SD.ui.toast('计时中，请先停止或取消')
+      el.querySelectorAll('[data-mode]').forEach(x => x.classList.remove('on')); b.classList.add('on')
+      const timer = b.dataset.mode === 'timer'
+      el.querySelector('#sl-timer').hidden = !timer
+      el.querySelector('#sl-manual').hidden = timer
+    }))
     el.querySelector('#s-start').value = SD.time.nowTime()
     el.querySelector('#s-end').value = SD.time.nowTime()
+    el.querySelector('#sl-go').addEventListener('click', () => {
+      const btn = el.querySelector('#sl-go'), note = el.querySelector('#sl-note')
+      if (!running) {
+        running = true; startAt = Date.now(); seconds = 0
+        startStr = SD.time.nowTime(); startDate = SD.time.todayStr()   // 跨午夜：按入睡日存
+        btn.textContent = '☀️ 醒来了，停止记录'; btn.classList.add('rec')
+        note.innerHTML = '睡觉中… <a href="#home" id="sl-cancel">取消计时</a>'
+        el.querySelectorAll('[data-mode]').forEach(x => (x.disabled = true))
+        note.querySelector('#sl-cancel').addEventListener('click', e => {
+          e.preventDefault(); clearInterval(tick); location.hash = '#home'
+        })
+        tick = setInterval(() => {
+          seconds = Math.floor((Date.now() - startAt) / 1000)
+          el.querySelector('#sl-clock').textContent = SD.time.fmtClock(seconds)
+        }, 1000)
+      } else {
+        clearInterval(tick)
+        const mins = SD.time.clockMinutes(seconds)
+        if (mins < 1) return SD.ui.toast('不足 1 分钟，未记录（点「取消计时」放弃）')
+        SD.store.addRecord({ type: 'sleep', date: startDate, start: startStr, end: SD.time.nowTime() })
+        SD.ui.toast(`本次睡眠 ${(mins / 60).toFixed(1)} 小时已记录`)
+        location.hash = '#feed'
+      }
+    })
     el.querySelector('#s-save').addEventListener('click', () => {
-      SD.store.addRecord({ type: 'sleep', date: SD.time.todayStr(), start: el.querySelector('#s-start').value, end: el.querySelector('#s-end').value })
+      const start = el.querySelector('#s-start').value, end = el.querySelector('#s-end').value
+      if (!start || !end) return SD.ui.toast('请填入睡与醒来时间')
+      if (start === end) return SD.ui.toast('入睡与醒来相同——跨午夜请把醒来填为较小时间（如 23:00 → 01:30）')
+      SD.store.addRecord({ type: 'sleep', date: SD.time.todayStr(), start, end })
       location.hash = '#feed'
     })
   }
@@ -441,7 +488,7 @@ SD.views = (() => {
     feed: SD.summary.feedMethod(r) === 'nurse'
       ? `亲喂（${({ L: '左', R: '右', B: '双侧' })[r.side] || ''}${r.minutes ? ' ' + r.minutes + 'min' : ''}）`
       : `奶粉 ${r.ml || 0}ml`,
-    sleep: `睡眠 ${r.start}–${r.end}`, pee: '尿尿', poop: '便便', vitd: '维生素D', dha: 'DHA', iron: '铁剂',
+    sleep: `睡眠 ${r.start}–${r.end}${r.start && r.end ? `（${(SD.summary.sleepMin(r.start, r.end) / 60).toFixed(1)}h）` : ''}`, pee: '尿尿', poop: '便便', vitd: '维生素D', dha: 'DHA', iron: '铁剂',
     temp: `体温 ${r.val}℃（${r.part || ''}）`,
     measure: `测量 身高${r.height || '-'}cm 体重${r.weight || '-'}kg${r.head ? ' 头围' + r.head + 'cm' : ''}`,
     food: `新辅食：${r.name}`, 'food-ok': `${r.name} 观察 3 天无反应`,
