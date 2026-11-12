@@ -122,6 +122,30 @@ describe('summary: 今日汇总', () => {
   });
 });
 
+describe('summary: 时间轴分组排序', () => {
+  it('日内按记录时间倒序——补录的早时点记录落到对应位置（非录入顺序）', () => {
+    const t = SD.summary.timelineDays([
+      { type: 'feed',  date: '2026-09-15', time: '10:00' },
+      { type: 'sleep', date: '2026-09-15', start: '12:00', end: '13:00' },  // 睡眠用 start
+      { type: 'pee',   date: '2026-09-15', time: '06:30' },                 // 后录入但时间最早
+    ], 5)
+    assert.equal(t.length, 1)
+    assert.deepEqual(t[0].items.map(r => r.type), ['sleep', 'feed', 'pee'])
+  })
+
+  it('多日：日期倒序分组只取最近 n 天；无时间字段排该日末尾', () => {
+    const t = SD.summary.timelineDays([
+      { type: 'feed',  date: '2026-09-14', time: '23:00' },
+      { type: 'diary', date: '2026-09-15' },                                // 无 time/start
+      { type: 'feed',  date: '2026-09-15', time: '08:00' },
+      { type: 'feed',  date: '2026-09-13', time: '09:00' },                 // 超出 n=2 被截断
+    ], 2)
+    assert.deepEqual(t.map(d => d.date), ['2026-09-15', '2026-09-14'])
+    assert.deepEqual(t[0].items.map(r => r.type), ['feed', 'diary'])
+    assert.equal(t.length, 2)
+  })
+});
+
 describe('data: 字典健全性', () => {
   it('疫苗字典结构完整且含出生剂', () => {
     assert.ok(Array.isArray(SD.DATA.vaccine) && SD.DATA.vaccine.length > 5);

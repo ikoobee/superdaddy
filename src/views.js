@@ -456,11 +456,11 @@ SD.views = (() => {
 
   function feed(el) {
     if (!child()) return onboard(el)
-    // 待产包/42天清单等勾选类不进时间轴
+    // 待产包/42天清单等勾选类不进时间轴；日内按记录时间倒序（timelineDays：补录早时点落到时间位置）
     const recs = SD.store.recordsOf().filter(r => !['bag', 'd42', 'ctmark'].includes(r.type))
-    const days = [...new Set(recs.map(r => r.date))].sort().reverse().slice(0, 5)
+    const days = SD.summary.timelineDays(recs, 5)
     el.innerHTML = days.length
-      ? days.map(d => `<div class="sec-title">${d}</div>` + recs.filter(r => r.date === d).slice().reverse().map(r => `
+      ? days.map(d => `<div class="sec-title">${d.date}</div>` + d.items.map(r => `
           <div class="tl-item"><span class="icon">${iconOf(r)}</span><span class="desc">${esc(LABEL(r))}</span>
           <span class="t">${r.time || r.start || ''}</span><button class="del" data-id="${r.id}">✕</button></div>`).join('')).join('')
       : `<div class="empty"><p>还没有记录</p><p class="note">回首页用快捷按钮打卡</p></div>`

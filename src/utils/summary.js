@@ -31,4 +31,21 @@ SD.summary = {
       vitd: day.some(r => r.type === 'vitd'),
     }
   },
+
+  /**
+   * 记录页时间轴分组：日期倒序取最近 n 天；日内按记录时间倒序（time，睡眠用 start）。
+   * 补录早时点记录落到时间位置而非录入位置；无时间字段排该日末尾；同时间保持录入顺序。
+   */
+  timelineDays(records, n) {
+    const recs = records || []
+    const days = [...new Set(recs.map(r => r.date))].filter(Boolean).sort().reverse().slice(0, n)
+    return days.map(date => {
+      const items = recs
+        .filter(r => r.date === date)
+        .map((r, i) => ({ r, i, k: r.time || r.start || '' }))
+        .sort((a, b) => (a.k < b.k ? 1 : a.k > b.k ? -1 : a.i - b.i))
+        .map(x => x.r)
+      return { date, items }
+    })
+  },
 }
