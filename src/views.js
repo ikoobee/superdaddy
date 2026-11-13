@@ -1646,7 +1646,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
           <label class="field">本机是谁（新记录将署名）</label>
           <select id="fam-self">${st.family.members.map(m => `<option value="${m.id}" ${m.id === st.family.selfId ? 'selected' : ''}>${esc(m.name)}（${esc(m.role || '成员')}）</option>`).join('')}</select>
           <p></p>
-          ${st.family.members.map(m => `<div class="tl-item"><span class="desc"><b>${esc(m.name)}</b> · ${esc(m.role || '成员')}${m.id === st.family.selfId ? ' · 本机' : ''}</span><button class="del" data-mrm="${m.id}">✕</button></div>`).join('')}
+          ${st.family.members.map(m => `<div class="tl-item"><span class="desc"><b>${esc(m.name)}</b> · ${esc(m.role || '成员')}${m.id === st.family.selfId ? ' · 本机' : ''}</span><button class="btn ghost" data-mrn="${m.id}">改名</button><button class="del" data-mrm="${m.id}">✕</button></div>`).join('')}
           <div class="row">
             <input type="text" id="fam-name" placeholder="成员名" style="flex:1">
             <select id="fam-role"><option>妈妈</option><option>爸爸</option><option>爷爷</option><option>奶奶</option><option>外公</option><option>外婆</option><option>其他</option></select>
@@ -1691,16 +1691,61 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
     el.querySelector('#s-open-add').addEventListener('click', () =>
       openAddModal(() => { location.hash = '#settings'; SD.app.render() }))
     el.querySelector('#s-feedremind').addEventListener('change', e => { SD.state.feedRemind = e.target.checked; SD.store.save() })
-    /* 家庭协作：模式切换 / 成员管理 / 本机身份 */
+    /* 家庭协作：模式切换（开启即设本机身份）/ 成员管理 / 本机身份 */
+    const ROLES = ['妈妈', '爸爸', '爷爷', '奶奶', '外公', '外婆', '其他']
+    const roleOptions = cur => ROLES.map(r => `<option ${r === cur ? 'selected' : ''}>${r}</option>`).join('')
+    /* 开启家庭模式：先设「本机是谁」（称呼+角色）——记录署名即家人可辨，废除占位成员 */
+    const openIdentityModal = () => {
+      document.getElementById('identity-modal')?.remove()
+      const ov = document.createElement('div')
+      ov.className = 'overlay'; ov.id = 'identity-modal'
+      ov.innerHTML = `<div class="modal"><h3>开启家庭模式 · 本机是谁？</h3>
+        <p class="note" style="display:block">这台设备上的记录将以此称呼署名（时间轴/交接卡可见），家人同步数据后一眼可辨。</p>
+        <label class="field">称呼</label><input type="text" id="id-name" maxlength="8" placeholder="如：妈妈 / 爸爸 / 奶奶">
+        <label class="field">角色</label><select id="id-role">${roleOptions('妈妈')}</select>
+        <p></p><div class="row"><button class="btn ghost" id="id-cancel">取消</button><button class="btn" id="id-save">开启家庭模式</button></div></div>`
+      document.body.appendChild(ov)
+      ov.addEventListener('click', e => { if (e.target === ov) { ov.remove(); settings(el) } })
+      ov.querySelector('#id-cancel').addEventListener('click', () => { ov.remove(); settings(el) })
+      ov.querySelector('#id-save').addEventListener('click', () => {
+        const name = ov.querySelector('#id-name').value.trim()
+        if (!name) return SD.ui.toast('请填一个称呼（家人一看就懂的那种）')
+        const id = 'm' + Date.now().toString(36)
+        SD.state.family = { members: [{ id, name, role: ov.querySelector('#id-role').value }], selfId: id }
+        SD.store.save(); ov.remove(); settings(el)
+        SD.ui.toast(`家庭模式已开启 · 本机身份「${name}」`)
+      })
+      ov.querySelector('#id-name').focus()
+    }
+    /* 成员改名（本机或家人）：id 不变 → 记录署名保持，改名经同步传播 */
+    const openRenameModal = mid => {
+      const m = SD.state.family.members.find(x => x.id === mid)
+      if (!m) return
+      document.getElementById('rename-modal')?.remove()
+      const ov = document.createElement('div')
+      ov.className = 'overlay'; ov.id = 'rename-modal'
+      ov.innerHTML = `<div class="modal"><h3>修改成员</h3>
+        <label class="field">称呼</label><input type="text" id="rn-name" maxlength="8" value="${esc(m.name)}">
+        <label class="field">角色</label><select id="rn-role">${roleOptions(m.role)}</select>
+        <p class="note" style="display:block">历史记录的署名不受影响；改名会同步到家人设备。</p>
+        <p></p><div class="row"><button class="btn ghost" id="rn-cancel">取消</button><button class="btn" id="rn-save">保存</button></div></div>`
+      document.body.appendChild(ov)
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+      ov.querySelector('#rn-cancel').addEventListener('click', () => ov.remove())
+      ov.querySelector('#rn-save').addEventListener('click', () => {
+        const name = ov.querySelector('#rn-name').value.trim()
+        if (!name) return SD.ui.toast('称呼不能为空')
+        m.name = name; m.role = ov.querySelector('#rn-role').value
+        SD.store.save(); ov.remove(); settings(el)
+        SD.sync?.schedulePush?.()   // 改名传播
+      })
+    }
     el.querySelectorAll('[data-fam]').forEach(b => b.addEventListener('click', () => {
       if (b.dataset.fam === 'single') { SD.state.family = null; SD.store.save(); return settings(el) }
-      if (!SD.state.family) {
-        const id = 'm' + Date.now().toString(36)
-        SD.state.family = { members: [{ id, name: '我', role: '其他' }], selfId: id }
-        SD.store.save()
-      }
+      if (!SD.state.family) return openIdentityModal()
       settings(el)
     }))
+    el.querySelectorAll('[data-mrn]').forEach(b => b.addEventListener('click', () => openRenameModal(b.dataset.mrn)))
     el.querySelector('#fam-add')?.addEventListener('click', () => {
       const name = el.querySelector('#fam-name').value.trim()
       if (!name) return SD.ui.toast('请填成员名')

@@ -99,6 +99,17 @@ describe('merge: 集合并集与设备私有字段', () => {
     assert.deepEqual(s.deletedIds, [])
   })
 
+  it('members 同 id：远端改名/改角色传播（非空字段覆盖）', () => {
+    const local = { ...base(), family: { members: [{ id: 'm1', name: '妈妈', role: '妈妈' }, { id: 'm2', name: '爸爸', role: '爸爸' }], selfId: 'm1' } }
+    const remote = { ...base(), family: { members: [{ id: 'm1', name: '妈咪', role: '其他' }, { id: 'm3', name: '奶奶', role: '奶奶' }], selfId: 'm3' } }
+    const { state } = SD.merge.mergeState(local, remote)
+    const m1 = state.family.members.find(m => m.id === 'm1')
+    assert.equal(m1.name, '妈咪')                                  // 改名传播
+    assert.equal(m1.role, '其他')                                   // 角色更新传播
+    assert.equal(state.family.members.length, 3)                    // 并集
+    assert.equal(state.family.selfId, 'm1')                         // 本机身份不动
+  })
+
   it('合并后修复 activeId：本机从未有宝宝（null）→ 取合并结果第一个孩子（B 端加入同步场景）', () => {
     const local = { ...base(), children: [], activeId: null }        // 无痕新站：从未建宝宝
     const remote = { ...base() }                                      // A 端：c1 + activeId c1

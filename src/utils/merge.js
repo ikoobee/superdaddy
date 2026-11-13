@@ -46,11 +46,15 @@ SD.merge = (() => {
     const taskMap = new Map()
     for (const t of [...(remote.tasks || []), ...(local.tasks || [])]) taskMap.set(t.id, t)
 
-    /* family：selfId 本机私有；members 并集（对方设备新增的成员传播） */
+    /* family：selfId 本机私有；members 并集 + 同 id 改名/改角色传播（非空字段覆盖） */
     let family = local.family || null
     if (family && remote.family) {
       const mMap = new Map(family.members.map(m => [m.id, m]))
-      for (const m of remote.family.members || []) if (!mMap.has(m.id)) mMap.set(m.id, m)
+      for (const m of remote.family.members || []) {
+        const e = mMap.get(m.id)
+        if (!e) mMap.set(m.id, m)
+        else mMap.set(m.id, { ...e, ...Object.fromEntries(Object.entries(m).filter(([, v]) => v != null && v !== '')) })
+      }
       family = { ...family, members: [...mMap.values()] }
     }
 
