@@ -511,7 +511,7 @@ SD.views = (() => {
     const days = SD.summary.timelineDays(recs, 5)
     el.innerHTML = days.length
       ? days.map(d => `<div class="sec-title">${d.date}</div>` + d.items.map(r => `
-          <div class="tl-item"><span class="icon">${iconOf(r)}</span><span class="desc">${esc(LABEL(r))}</span>
+          <div class="tl-item"><span class="icon">${iconOf(r)}</span><span class="desc">${esc(LABEL(r))}${SD.state.family && r.by ? `<span class="note"> · ${esc(SD.state.family.members.find(m => m.id === r.by)?.name || '?')}</span>` : ''}</span>
           <span class="t">${r.time || r.start || ''}</span><button class="del" data-id="${r.id}">✕</button></div>`).join('')).join('')
       : `<div class="empty"><p>还没有记录</p><p class="note">回首页用快捷按钮打卡</p></div>`
     el.querySelectorAll('.del').forEach(b => b.addEventListener('click', () => { SD.store.removeRecord(b.dataset.id); feed(el) }))
@@ -1371,7 +1371,12 @@ SD.views = (() => {
 今日喂养：共 ${s.feedCount} 次（亲喂 ${s.nurseCount} · 奶粉 ${s.formulaCount}${s.formulaMl ? ` · 奶粉共 ${s.formulaMl}ml` : ''}）
 今日睡眠：${(s.sleepMinutes / 60).toFixed(1)} 小时
 尿 ${s.pee} 次 / 便 ${s.poop} 次 / 维生素D ${s.vitd ? '已补' : '❗未补'}
-${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\n` : ''}${next ? `下一剂疫苗：${next.name} 第${next.dose}剂（${next.sched}）\n` : ''}
+${(() => {   // 家庭模式：按成员署名统计今日记录
+  if (!SD.state.family) return ''
+  const today = SD.time.todayStr(), recs = SD.store.recordsOf().filter(r => r.date === today)
+  const parts = SD.state.family.members.map(m => `${m.name} ${recs.filter(r => r.by === m.id).length}`).filter(x => !/\s0$/.test(x))
+  return parts.length ? `今日记录（按人）：${parts.join(' · ')}\n` : ''
+})()}${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\n` : ''}${next ? `下一剂疫苗：${next.name} 第${next.dose}剂（${next.sched}）\n` : ''}
 —— 由超级奶爸工作台本地生成，数据未上传`
 
     el.innerHTML = `
@@ -1631,6 +1636,25 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
           ${c.id === st.activeId ? '<span class="vac-badge done">当前</span>' : `<button class="btn ghost" data-sw="${c.id}">切换</button>`}
           <button class="del" data-rm="${c.id}">✕</button></div>`).join('')}
       <p></p><button class="btn ghost" id="s-open-add">＋ 添加宝宝</button>
+      <div class="sec-title">家庭协作</div>
+      <div class="card">
+        <div class="seg">
+          <button class="seg-btn ${!st.family ? 'on' : ''}" data-fam="single">👤 单人使用</button>
+          <button class="seg-btn ${st.family ? 'on' : ''}" data-fam="family">👨‍👩‍👧 家庭多人</button>
+        </div>
+        ${st.family ? `
+          <label class="field">本机是谁（新记录将署名）</label>
+          <select id="fam-self">${st.family.members.map(m => `<option value="${m.id}" ${m.id === st.family.selfId ? 'selected' : ''}>${esc(m.name)}（${esc(m.role || '成员')}）</option>`).join('')}</select>
+          <p></p>
+          ${st.family.members.map(m => `<div class="tl-item"><span class="desc"><b>${esc(m.name)}</b> · ${esc(m.role || '成员')}${m.id === st.family.selfId ? ' · 本机' : ''}</span><button class="del" data-mrm="${m.id}">✕</button></div>`).join('')}
+          <div class="row">
+            <input type="text" id="fam-name" placeholder="成员名" style="flex:1">
+            <select id="fam-role"><option>妈妈</option><option>爸爸</option><option>爷爷</option><option>奶奶</option><option>外公</option><option>外婆</option><option>其他</option></select>
+            <button class="btn ghost" id="fam-add">＋ 添加</button>
+          </div>
+          <p class="note">家人各自记录的汇总方式：导出备份发给对方 → 对方在「从备份恢复」选<b>合并导入</b>（自动按记录去重，删除 30 天内不会被复活）。单人模式行为与从前完全一致。</p>
+        ` : `<p class="note">多位家人各自手机记录？切换到家庭模式：记录署名 + 备份合并导入，数据仍全部本地。</p>`}
+      </div>
       <div class="sec-title">提醒</div>
       <div class="card">
         <label class="field" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="s-feedremind" ${st.feedRemind ? 'checked' : ''}> 待喂养提醒（首页倒计时卡 + 到时应用内提示）</label>
@@ -1652,6 +1676,31 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
     el.querySelector('#s-open-add').addEventListener('click', () =>
       openAddModal(() => { location.hash = '#settings'; SD.app.render() }))
     el.querySelector('#s-feedremind').addEventListener('change', e => { SD.state.feedRemind = e.target.checked; SD.store.save() })
+    /* 家庭协作：模式切换 / 成员管理 / 本机身份 */
+    el.querySelectorAll('[data-fam]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.fam === 'single') { SD.state.family = null; SD.store.save(); return settings(el) }
+      if (!SD.state.family) {
+        const id = 'm' + Date.now().toString(36)
+        SD.state.family = { members: [{ id, name: '我', role: '其他' }], selfId: id }
+        SD.store.save()
+      }
+      settings(el)
+    }))
+    el.querySelector('#fam-add')?.addEventListener('click', () => {
+      const name = el.querySelector('#fam-name').value.trim()
+      if (!name) return SD.ui.toast('请填成员名')
+      const id = 'm' + Date.now().toString(36)
+      SD.state.family.members.push({ id, name, role: el.querySelector('#fam-role').value })
+      SD.store.save(); settings(el)
+    })
+    el.querySelector('#fam-self')?.addEventListener('change', e => { SD.state.family.selfId = e.target.value; SD.store.save() })
+    el.querySelectorAll('[data-mrm]').forEach(b => b.addEventListener('click', () => {
+      const f = SD.state.family
+      if (f.members.length <= 1) return SD.ui.toast('至少保留一位成员（可切换回单人模式）')
+      f.members = f.members.filter(m => m.id !== b.dataset.mrm)
+      if (f.selfId === b.dataset.mrm) f.selfId = f.members[0].id
+      SD.store.save(); settings(el)
+    }))
     el.querySelector('#s-feednotify').addEventListener('change', e => {
       const on = () => { SD.state.feedNotify = true; SD.store.save(); SD.ui.toast('到时通知已开启（仅应用打开期间）') }
       const off = msg => { e.target.checked = false; SD.state.feedNotify = false; SD.store.save(); if (msg) SD.ui.toast(msg) }
@@ -1699,8 +1748,40 @@ ${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\
     el.querySelector('#s-import').addEventListener('change', e => {
       const f = e.target.files[0]; if (!f) return
       const rd = new FileReader()
-      rd.onload = () => { try { SD.store.importJSON(rd.result); SD.ui.toast('恢复成功'); location.hash = '#home' } catch (err) { SD.ui.toast('恢复失败：' + err.message) } }
+      rd.onload = () => {
+        const text = rd.result
+        if (!SD.state.family) {   // 单人模式：维持原有覆盖恢复
+          try { SD.store.importJSON(text); SD.ui.toast('恢复成功'); location.hash = '#home' }
+          catch (err) { SD.ui.toast('恢复失败：' + err.message) }
+          return
+        }
+        /* 家庭模式：合并（并集去重）或覆盖 二选一 */
+        document.getElementById('import-modal')?.remove()
+        const ov = document.createElement('div')
+        ov.className = 'overlay'; ov.id = 'import-modal'
+        ov.innerHTML = `<div class="modal"><h3>导入家人备份</h3>
+          <p class="note">合并：两台设备的记录并成一份（自动去重，删除不复活）；覆盖：用这份备份替换本机全部数据。</p>
+          <p></p><div class="row">
+            <button class="btn ghost" id="im-cancel">取消</button>
+            <button class="btn ghost" id="im-replace">覆盖</button>
+            <button class="btn" id="im-merge">合并导入</button>
+          </div></div>`
+        document.body.appendChild(ov)
+        const done = msg => { ov.remove(); SD.ui.toast(msg); settings(el); SD.app.render() }
+        ov.addEventListener('click', ev => { if (ev.target === ov) ov.remove() })
+        ov.querySelector('#im-cancel').addEventListener('click', () => ov.remove())
+        ov.querySelector('#im-merge').addEventListener('click', () => {
+          try {
+            const st = SD.store.importMerge(text)
+            done(`合并完成：并入 ${st.recordsAdded} 条 · 更新 ${st.recordsUpdated} 条`)
+          } catch (err) { SD.ui.toast('合并失败：' + err.message); ov.remove() }
+        })
+        ov.querySelector('#im-replace').addEventListener('click', () => {
+          try { SD.store.importJSON(text); done('已覆盖恢复') } catch (err) { SD.ui.toast('恢复失败：' + err.message); ov.remove() }
+        })
+      }
       rd.readAsText(f)
+      e.target.value = ''
     })
     el.querySelector('#s-clear').addEventListener('click', () => {
       SD.ui.confirm('确定清空全部数据？\n不可恢复（建议先导出）\n\n真的要清空吗？', () => {

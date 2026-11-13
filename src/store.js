@@ -41,10 +41,20 @@ SD.store = (() => {
       return SD.state.records.filter(r => (r.childId || 'c1') === id)
     },
     addRecord(rec) {
-      SD.state.records.push({ id: uid(), childId: SD.state.activeId, ...rec })
+      SD.state.records.push({
+        id: uid(), childId: SD.state.activeId, updatedAt: new Date().toISOString(),
+        ...(SD.state.family?.selfId ? { by: SD.state.family.selfId } : {}),   // 家庭模式署名
+        ...rec,
+      })
       save()
     },
-    removeRecord(id) { SD.state.records = SD.state.records.filter(r => r.id !== id); save() },
+    removeRecord(id) {
+      SD.state.records = SD.state.records.filter(r => r.id !== id)
+      /* 墓碑：合并导入时防止对方旧备份复活已删记录（30 天过期） */
+      if (id && !(SD.state.deletedIds || []).some(t => t.id === id))
+        (SD.state.deletedIds = SD.state.deletedIds || []).push({ id, at: new Date().toISOString() })
+      save()
+    },
     vaccineDone(childId) {
       const id = childId || SD.state.activeId
       return SD.state.vaccineDoneByChild[id] || (SD.state.vaccineDoneByChild[id] = [])
@@ -78,6 +88,14 @@ SD.store = (() => {
       if (!obj || obj.app !== 'superdaddy' || !obj.data) throw new Error('不是 superdaddy 备份文件')
       SD.state = SD.storeMigrate(obj.data)   // 兼容 v1 备份
       save()
+    },
+    /** F1 家庭合并导入：并集合并（记录 LWW/墓碑/指纹去重），返回统计 */
+    importMerge(text) {
+      const obj = JSON.parse(text)
+      if (!obj || obj.app !== 'superdaddy' || !obj.data) throw new Error('不是 superdaddy 备份文件')
+      const { state, stats } = SD.merge.mergeState(SD.state, SD.storeMigrate(obj.data))
+      SD.state = state; save()
+      return stats
     },
     clearAll() { SD.state = SD.storeMigrate(null); localStorage.removeItem(KEY); localStorage.removeItem('superdaddy-v1') },
   }
