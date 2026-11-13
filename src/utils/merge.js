@@ -54,11 +54,17 @@ SD.merge = (() => {
       family = { ...family, members: [...mMap.values()] }
     }
 
+    /* activeId 设备私有，但必须指向合并后仍存在的孩子：无效/为空时回落到合并结果第一个
+       （B 端无宝宝加入同步：children 已并入而 activeId=null 会让界面全空） */
+    const children = [...childMap.values()]
+    const activeId = children.some(c => c.id === local.activeId) ? local.activeId : (children[0]?.id ?? null)
+
     return {
       state: {
-        ...local,   // lastBackup/activeId/feedRemind 等设备字段保留本机
+        ...local,   // lastBackup/feedRemind/sync 等设备字段保留本机
         records, deletedIds: [...tomb.entries()].map(([id, at]) => ({ id, at })),
-        children: [...childMap.values()],
+        children,
+        activeId,
         vaccineDoneByChild: vac,
         epdsHistory: [...epdsMap.values()],
         tasks: [...taskMap.values()],

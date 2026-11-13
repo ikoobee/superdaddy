@@ -98,4 +98,22 @@ describe('merge: 集合并集与设备私有字段', () => {
     assert.equal(s.family, null)
     assert.deepEqual(s.deletedIds, [])
   })
+
+  it('合并后修复 activeId：本机从未有宝宝（null）→ 取合并结果第一个孩子（B 端加入同步场景）', () => {
+    const local = { ...base(), children: [], activeId: null }        // 无痕新站：从未建宝宝
+    const remote = { ...base() }                                      // A 端：c1 + activeId c1
+    const { state } = SD.merge.mergeState(local, remote)
+    assert.equal(state.children.length, 1)
+    assert.equal(state.activeId, 'c1')
+  })
+
+  it('activeId 指向合并后已不存在的孩子 → 回落到现存第一个', () => {
+    const local = { ...base(), activeId: 'cGone' }                    // 指向已被对方删掉的孩子
+    const remote = { ...base(), children: [{ id: 'cX', name: 'B', birth: '2027-01-01' }] }
+    const { state } = SD.merge.mergeState(local, remote)
+    assert.equal(state.activeId, 'c1')                                // 本机孩子仍在 → 保本机选中
+    const local2 = { ...base(), children: [], activeId: 'cGone' }
+    const { state: s2 } = SD.merge.mergeState(local2, remote)
+    assert.equal(s2.activeId, 'cX')                                   // 本机无孩子 → 取远端孩子
+  })
 })
