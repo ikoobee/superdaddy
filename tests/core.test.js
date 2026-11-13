@@ -138,6 +138,14 @@ describe('summary: 时间轴分组排序', () => {
     assert.deepEqual(t[0].items.map(r => r.type), ['sleep', 'feed', 'pee'])
   })
 
+  it('相同时间的记录顺序与数组位置无关（跨设备合并后展示一致）', () => {
+    const a = { id: 'rX1', type: 'pee',  date: '2026-09-15', time: '10:00' }
+    const b = { id: 'rX2', type: 'feed', date: '2026-09-15', time: '10:00' }
+    const t1 = SD.summary.timelineDays([a, b], 5)[0].items.map(r => r.id)
+    const t2 = SD.summary.timelineDays([b, a], 5)[0].items.map(r => r.id)
+    assert.deepEqual(t1, t2)
+  })
+
   it('多日：日期倒序分组只取最近 n 天；无时间字段排该日末尾', () => {
     const t = SD.summary.timelineDays([
       { type: 'feed',  date: '2026-09-14', time: '23:00' },
