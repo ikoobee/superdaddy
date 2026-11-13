@@ -1638,36 +1638,37 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
       <p></p><button class="btn ghost" id="s-open-add">＋ 添加宝宝</button>
       <div class="sec-title">家庭协作</div>
       <div class="card">
-        <div class="seg">
-          <button class="seg-btn ${!st.family ? 'on' : ''}" data-fam="single">👤 单人使用</button>
-          <button class="seg-btn ${st.family ? 'on' : ''}" data-fam="family">👨‍👩‍👧 家庭多人</button>
-        </div>
         ${st.family ? `
           <label class="field">本机是谁（新记录将署名）</label>
-          <select id="fam-self">${st.family.members.map(m => `<option value="${m.id}" ${m.id === st.family.selfId ? 'selected' : ''}>${esc(m.name)}（${esc(m.role || '成员')}）</option>`).join('')}</select>
+          <div class="row">
+            <select id="fam-self" style="flex:1">${st.family.members.map(m => `<option value="${m.id}" ${m.id === st.family.selfId ? 'selected' : ''}>${esc(m.name)}（${esc(m.role || '成员')}）</option>`).join('')}</select>
+            <button class="btn ghost" id="fam-newid">＋ 新身份</button>
+          </div>
+          <p class="note">共用一台设备换人记录时，切换本机身份或新增身份；成员随家人设备加入自动出现。</p>
           <p></p>
           ${st.family.members.map(m => `<div class="tl-item"><span class="desc"><b>${esc(m.name)}</b> · ${esc(m.role || '成员')}${m.id === st.family.selfId ? ' · 本机' : ''}</span><button class="btn ghost" data-mrn="${m.id}">改名</button><button class="del" data-mrm="${m.id}">✕</button></div>`).join('')}
-          <div class="row">
-            <input type="text" id="fam-name" placeholder="成员名" style="flex:1">
-            <select id="fam-role"><option>妈妈</option><option>爸爸</option><option>爷爷</option><option>奶奶</option><option>外公</option><option>外婆</option><option>其他</option></select>
-            <button class="btn ghost" id="fam-add">＋ 添加</button>
-          </div>
-          <p class="note">家人各自记录的汇总方式：导出备份发给对方 → 对方在「从备份恢复」选<b>合并导入</b>（自动按记录去重，删除 30 天内不会被复活）。单人模式行为与从前完全一致。</p>
+          <p class="note">不用云同步也可协作：导出备份发给对方 → 对方「从备份恢复」选<b>合并导入</b>（自动去重，删除 30 天内不复活）。</p>
           <p></p>
           <label class="field" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fam-cloud" ${st.sync ? 'checked' : ''}> ☁️ 云同步（端到端加密中转）</label>
           ${st.sync ? (st.sync.room ? `
             <p class="note">开启中：数据以<b>密文</b>上传 Cloudflare 中转与家人共享——服务器无法解密（零知识），密钥只在本机。</p>
-            <label class="field">家庭同步码（发给家人，在其设备「加入」处粘贴）</label>
+            <label class="field">家庭同步码（发给家人，在其设备「加入家庭」处粘贴）</label>
             <div class="row"><input type="text" readonly value="${st.sync.room}/${st.sync.pass}" style="flex:1" onfocus="this.select()"><button class="btn ghost" id="fam-copycode">复制</button></div>
             <p class="note">上次同步：${st.sync.lastPull ? SD.time.fmtAgo(st.sync.lastPull) : '从未'}${st.sync.lastPush ? ' · 推送 ' + SD.time.fmtAgo(st.sync.lastPush) : ''}</p>
             <p></p><button class="btn" id="fam-sync">🔄 立即同步</button>
           ` : `
             <p></p>
-            <div class="row"><button class="btn ghost" id="fam-gencode" style="flex:1">创建新的家庭同步码</button></div>
-            <p class="note">或加入家人已创建的：</p>
-            <div class="row"><input type="text" id="fam-joincode" placeholder="粘贴同步码（房间码/密钥）" style="flex:1"><button class="btn ghost" id="fam-join">加入</button></div>
+            <div class="row"><button class="btn ghost" id="fam-gencode" style="flex:1">创建新的家庭同步码</button><button class="btn ghost" id="fam-joinbtn" style="flex:1">🔗 加入（粘贴同步码）</button></div>
           `) : `<p class="note">需与家人自动共享？开启后经 Cloudflare 中转上传<b>加密</b>数据（端到端，服务器零知识）。</p>`}
-        ` : `<p class="note">多位家人各自手机记录？切换到家庭模式：记录署名 + 备份合并导入，数据仍全部本地。</p>`}
+          <p></p><button class="btn ghost" data-fam="single">退出家庭模式（回到单人，数据保留）</button>
+        ` : `
+          <p class="note">多位家人各自手机记录？创建或加入家庭：记录署名 + 端到端加密同步（或纯本地备份合并）。</p>
+          <p></p>
+          <div class="row">
+            <button class="btn ghost" id="fam-create" style="flex:1">＋ 创建家庭</button>
+            <button class="btn ghost" id="fam-joinbtn" style="flex:1">🔗 加入家庭（有同步码）</button>
+          </div>
+        `}
       </div>
       <div class="sec-title">提醒</div>
       <div class="card">
@@ -1691,29 +1692,34 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
     el.querySelector('#s-open-add').addEventListener('click', () =>
       openAddModal(() => { location.hash = '#settings'; SD.app.render() }))
     el.querySelector('#s-feedremind').addEventListener('change', e => { SD.state.feedRemind = e.target.checked; SD.store.save() })
-    /* 家庭协作：模式切换（开启即设本机身份）/ 成员管理 / 本机身份 */
+    /* 家庭协作：创建/加入家庭 / 成员管理 / 本机身份 */
     const ROLES = ['妈妈', '爸爸', '爷爷', '奶奶', '外公', '外婆', '其他']
     const roleOptions = cur => ROLES.map(r => `<option ${r === cur ? 'selected' : ''}>${r}</option>`).join('')
-    /* 开启家庭模式：先设「本机是谁」（称呼+角色）——记录署名即家人可辨，废除占位成员 */
-    const openIdentityModal = () => {
+    /* 本机身份：未开家庭=开启并设身份；已开家庭=新增身份并切换（共用设备换人记录） */
+    const openIdentityModal = (onDone = null) => {
+      const creating = !SD.state.family
       document.getElementById('identity-modal')?.remove()
       const ov = document.createElement('div')
       ov.className = 'overlay'; ov.id = 'identity-modal'
-      ov.innerHTML = `<div class="modal"><h3>开启家庭模式 · 本机是谁？</h3>
+      ov.innerHTML = `<div class="modal"><h3>${creating ? '创建家庭 · 本机是谁？' : '新增本机身份'}</h3>
         <p class="note" style="display:block">这台设备上的记录将以此称呼署名（时间轴/交接卡可见），家人同步数据后一眼可辨。</p>
         <label class="field">称呼</label><input type="text" id="id-name" maxlength="8" placeholder="如：妈妈 / 爸爸 / 奶奶">
         <label class="field">角色</label><select id="id-role">${roleOptions('妈妈')}</select>
-        <p></p><div class="row"><button class="btn ghost" id="id-cancel">取消</button><button class="btn" id="id-save">开启家庭模式</button></div></div>`
+        <p></p><div class="row"><button class="btn ghost" id="id-cancel">取消</button><button class="btn" id="id-save">${creating ? '开启家庭模式' : '新增并切换'}</button></div></div>`
       document.body.appendChild(ov)
-      ov.addEventListener('click', e => { if (e.target === ov) { ov.remove(); settings(el) } })
-      ov.querySelector('#id-cancel').addEventListener('click', () => { ov.remove(); settings(el) })
+      const close = () => { ov.remove(); settings(el) }
+      ov.addEventListener('click', e => { if (e.target === ov) close() })
+      ov.querySelector('#id-cancel').addEventListener('click', close)
       ov.querySelector('#id-save').addEventListener('click', () => {
         const name = ov.querySelector('#id-name').value.trim()
         if (!name) return SD.ui.toast('请填一个称呼（家人一看就懂的那种）')
         const id = 'm' + Date.now().toString(36)
-        SD.state.family = { members: [{ id, name, role: ov.querySelector('#id-role').value }], selfId: id }
-        SD.store.save(); ov.remove(); settings(el)
-        SD.ui.toast(`家庭模式已开启 · 本机身份「${name}」`)
+        const member = { id, name, role: ov.querySelector('#id-role').value }
+        if (creating) SD.state.family = { members: [member], selfId: id }
+        else { SD.state.family.members.push(member); SD.state.family.selfId = id }
+        SD.store.save(); ov.remove()
+        SD.ui.toast(creating ? `家庭已创建 · 本机身份「${name}」` : `已切换到新身份「${name}」`)
+        onDone ? onDone() : settings(el)
       })
       ov.querySelector('#id-name').focus()
     }
@@ -1740,19 +1746,15 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
         SD.sync?.schedulePush?.()   // 改名传播
       })
     }
+    /* 退出家庭模式（回到单人；云同步一并关闭） */
     el.querySelectorAll('[data-fam]').forEach(b => b.addEventListener('click', () => {
-      if (b.dataset.fam === 'single') { SD.state.family = null; SD.store.save(); return settings(el) }
-      if (!SD.state.family) return openIdentityModal()
-      settings(el)
+      SD.ui.confirm('退出家庭模式？\n\n本机数据完整保留（含署名历史），云同步一并关闭。', () => {
+        SD.state.family = null; SD.state.sync = null; SD.store.save(); settings(el)
+      })
     }))
+    el.querySelector('#fam-create')?.addEventListener('click', () => openIdentityModal())
+    el.querySelector('#fam-newid')?.addEventListener('click', () => openIdentityModal())
     el.querySelectorAll('[data-mrn]').forEach(b => b.addEventListener('click', () => openRenameModal(b.dataset.mrn)))
-    el.querySelector('#fam-add')?.addEventListener('click', () => {
-      const name = el.querySelector('#fam-name').value.trim()
-      if (!name) return SD.ui.toast('请填成员名')
-      const id = 'm' + Date.now().toString(36)
-      SD.state.family.members.push({ id, name, role: el.querySelector('#fam-role').value })
-      SD.store.save(); settings(el)
-    })
     el.querySelector('#fam-self')?.addEventListener('change', e => { SD.state.family.selfId = e.target.value; SD.store.save() })
     el.querySelectorAll('[data-mrm]').forEach(b => b.addEventListener('click', () => {
       const f = SD.state.family
@@ -1761,15 +1763,8 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
       if (f.selfId === b.dataset.mrm) f.selfId = f.members[0].id
       SD.store.save(); settings(el)
     }))
-    /* F2 云同步：开关（明确告知上传密文）→ 配码（创建/加入）→ 手动同步 */
-    el.querySelector('#fam-cloud')?.addEventListener('change', e => {
-      if (!e.target.checked) {
-        SD.ui.confirm('关闭云同步？\n\n本机数据完整保留，只是不再上传/拉取；家人设备的旧密文 90 天无活动后自动过期。', () => {
-          SD.state.sync = null; SD.store.save(); settings(el)
-        })
-        return
-      }
-      /* 用户要求：切换开关时明确说明——共享数据需上传加密数据到后端 */
+    /* 加密上传告知弹层（用户核心要求：开启云同步必须明确说明数据以密文上传后端） */
+    const openConsent = (onYes, onCancel = null) => {
       document.getElementById('cloud-consent')?.remove()
       const ov = document.createElement('div')
       ov.className = 'overlay'; ov.id = 'cloud-consent'
@@ -1783,12 +1778,47 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
         </ul>
         <p></p><div class="row"><button class="btn ghost" id="cc-no">取消</button><button class="btn" id="cc-yes">我已了解，开启</button></div></div>`
       document.body.appendChild(ov)
-      ov.addEventListener('click', ev => { if (ev.target === ov) { ov.remove(); e.target.checked = false } })
-      ov.querySelector('#cc-no').addEventListener('click', () => { ov.remove(); e.target.checked = false })
-      ov.querySelector('#cc-yes').addEventListener('click', () => {
+      const cancel = () => { ov.remove(); onCancel?.() }
+      ov.addEventListener('click', ev => { if (ev.target === ov) cancel() })
+      ov.querySelector('#cc-no').addEventListener('click', cancel)
+      ov.querySelector('#cc-yes').addEventListener('click', () => { ov.remove(); onYes() })
+    }
+    /* 加入家庭一步直达：粘贴同步码 →（未开家庭先设身份）→ 加密告知 → 首同步 */
+    const openJoinModal = () => {
+      document.getElementById('join-modal')?.remove()
+      const ov = document.createElement('div')
+      ov.className = 'overlay'; ov.id = 'join-modal'
+      ov.innerHTML = `<div class="modal"><h3>🔗 加入家庭</h3>
+        <p class="note" style="display:block">粘贴家人分享的同步码（格式：房间码/密钥），加入后自动同步双方数据。</p>
+        <label class="field">同步码</label><input type="text" id="jm-code" placeholder="如：K7Q2M9XCV4T8B3NL/J6H4K2M9P7Q3R5S8">
+        <p></p><div class="row"><button class="btn ghost" id="jm-cancel">取消</button><button class="btn" id="jm-next">下一步</button></div></div>`
+      document.body.appendChild(ov)
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+      ov.querySelector('#jm-cancel').addEventListener('click', () => ov.remove())
+      ov.querySelector('#jm-next').addEventListener('click', () => {
+        const parsed = SD.sync.parseCode(ov.querySelector('#jm-code').value)
+        if (!parsed) return SD.ui.toast('同步码格式不对（应为 房间码/密钥）')
         ov.remove()
-        SD.state.sync = {}; SD.store.save(); settings(el)
+        const applyCode = () => {
+          if (!SD.state.sync)
+            return openConsent(() => { SD.state.sync = { ...parsed, lastPull: null, lastPush: null }; SD.store.save(); settings(el); runFirstSync() })
+          SD.state.sync = { ...parsed, lastPull: null, lastPush: null }; SD.store.save(); settings(el); runFirstSync()
+        }
+        if (!SD.state.family) return openIdentityModal(applyCode)   // 先设本机身份
+        applyCode()
       })
+      ov.querySelector('#jm-code').focus()
+    }
+    el.querySelector('#fam-joinbtn')?.addEventListener('click', openJoinModal)
+    /* F2 云同步开关（明确告知上传密文） */
+    el.querySelector('#fam-cloud')?.addEventListener('change', e => {
+      if (!e.target.checked) {
+        SD.ui.confirm('关闭云同步？\n\n本机数据完整保留，只是不再上传/拉取；家人设备的旧密文 90 天无活动后自动过期。', () => {
+          SD.state.sync = null; SD.store.save(); settings(el)
+        })
+        return
+      }
+      openConsent(() => { SD.state.sync = {}; SD.store.save(); settings(el) }, () => { e.target.checked = false })
     })
     /* 首次配码（创建/加入）后立即自动同步一次：用户预期「加入即有数据」 */
     const runFirstSync = () => {
@@ -1806,13 +1836,6 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
       SD.state.sync = { ...code, lastPull: null, lastPush: null }
       SD.store.save(); settings(el)
       runFirstSync()   // 把本机数据推上中转，家人加入即能拉到
-    })
-    el.querySelector('#fam-join')?.addEventListener('click', () => {
-      const parsed = SD.sync.parseCode(el.querySelector('#fam-joincode').value)
-      if (!parsed) return SD.ui.toast('同步码格式不对（应为 房间码/密钥）')
-      SD.state.sync = { ...parsed, lastPull: null, lastPush: null }
-      SD.store.save(); settings(el)
-      runFirstSync()   // 加入即拉取家人数据（并回推本机记录）
     })
     el.querySelector('#fam-copycode')?.addEventListener('click', () => {
       const code = `${SD.state.sync.room}/${SD.state.sync.pass}`
