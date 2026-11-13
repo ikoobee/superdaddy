@@ -16,6 +16,7 @@ SD.store = (() => {
 
   return {
     load, save,
+    KEY,   // localStorage 键名（多标签页 storage 事件监听用）
     get state() { return SD.state },
     get child() { return SD.state.children.find(c => c.id === SD.state.activeId) || null },
     addChild({ name, birth, due, gender }) {

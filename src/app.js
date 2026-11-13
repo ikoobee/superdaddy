@@ -77,10 +77,14 @@ SD.app = (() => {
       if (e.target.matches('input[type="date"]')) { try { e.target.showPicker() } catch {} }
     })
     render()
-    // F2 云同步：开启且已配码时，启动静默拉取 + 每 5 分钟/回前台自动拉取（失败不打扰）
+    // 同浏览器多标签页：storage 事件秒级互见（免网络；另一标签页写入本页即时重载渲染）
+    window.addEventListener('storage', e => {
+      if (e.key === SD.store.KEY) { SD.store.load(); SD.app.render() }
+    })
+    // F2 云同步：开启且已配码时，启动静默拉取 + 每 30 秒（可见时）/回前台自动拉取（失败不打扰）
     if (SD.state.sync && SD.state.sync.room) {
       SD.sync.autoPull()
-      setInterval(() => { if (!document.hidden) SD.sync.autoPull() }, 5 * 60e3)
+      setInterval(() => { if (!document.hidden) SD.sync.autoPull() }, 30e3)
       document.addEventListener('visibilitychange', () => { if (!document.hidden) SD.sync.autoPull() })
     }
     // PWA：仅网络协议下启用（manifest 动态注入 + SW 仅 https），file:// 双击完全不受影响
@@ -98,7 +102,7 @@ SD.app = (() => {
   /* ── PWA 自动更新（standalone 无刷新按钮的解法）──
      启动 + 回前台（10 分钟节流）主动 reg.update() 触发 sw.js 检查（绕过浏览器懒节奏）；
      新版 SW 经 skipWaiting 立即接管 → controllerchange → 弹提示一键刷新（不静默刷新：会打断进行中的喂奶/睡眠计时） */
-  const APP_VER = 'v0.8.3'
+  const APP_VER = 'v0.8.4'
   let lastUpdCheck = 0
   function setupAutoUpdate() {
     let hadController = !!navigator.serviceWorker.controller   // 首次安装 SW 的 claim 不算「有新版」
