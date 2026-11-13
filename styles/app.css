@@ -204,14 +204,31 @@ details.card[open] summary { margin-bottom: var(--space-2); }
 .ok-list { color: var(--ok); font-size: var(--text-sm); }
 .bad-list { color: var(--danger); font-size: var(--text-sm); }
 
-/* v0.3 组件 */
+/* v0.3 组件 · 计时页 v2（BA20）：状态可视化 + 主/次按钮语义 */
 .timer-face {
   font-family: var(--font-display); font-size: 3rem; font-weight: 700;
   text-align: center; color: var(--gray-900); font-variant-numeric: tabular-nums;
   padding: var(--space-4) 0; letter-spacing: 2px;
 }
+.timer-face.idle { color: var(--gray-400); }
+.timer-face .timer-dot { display: none; }
+.timer-face.running { color: var(--gray-900); }
+.timer-face.running .timer-dot {
+  display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--primary-500); margin-right: var(--space-3);
+  animation: timer-breathe 2s ease-in-out infinite;
+}
+@keyframes timer-breathe { 0%, 100% { opacity: .25 } 50% { opacity: 1 } }
 .primary-big { width: 100%; font-size: var(--text-lg); padding: var(--space-4); }
-.btn.rec { background: var(--danger); }
+/* 停止=完成并保存：主色加深（红色留给真正的危险操作） */
+.btn.rec { background: var(--primary-600); }
+/* 取消：安静的全宽次级按钮（触控 ≥44px），代替原小字链接 */
+.secondary-big {
+  width: 100%; font-size: var(--text-base); padding: var(--space-3);
+  background: transparent; color: var(--gray-500); border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md); margin-top: var(--space-2); cursor: pointer;
+}
+.secondary-big:active { color: var(--danger); border-color: var(--danger); }
 .dots { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .dot {
   font-size: var(--text-sm); color: var(--gray-400);

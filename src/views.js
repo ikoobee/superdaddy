@@ -341,8 +341,9 @@ SD.views = (() => {
               <button class="seg-btn" data-side="R">右</button>
               <button class="seg-btn" data-side="B">双侧</button>
             </div>
-            <div class="timer-face" id="f-clock">00:00</div>
+            <div class="timer-face idle" id="f-face"><span class="timer-dot" aria-hidden="true"></span><span id="f-clock">00:00</span></div>
             <button class="btn primary-big" id="f-go">▶ 开始亲喂</button>
+            <button class="secondary-big" id="f-cancel-btn" hidden>取消计时</button>
             <p class="note" id="f-note"></p>
           </div>
           <div id="f-manual" hidden>
@@ -373,18 +374,25 @@ SD.views = (() => {
       el.querySelector(`#f-side-seg [data-side="${t.side}"]`)?.classList.add('on')
       el.querySelector('#f-timer').hidden = false
       el.querySelector('#f-manual').hidden = true
+      const face = el.querySelector('#f-face')
+      face.classList.remove('idle'); face.classList.add('running')
       const btn = el.querySelector('#f-go')
       btn.textContent = '⏹ 停止并记录'; btn.classList.add('rec')
-      const note = el.querySelector('#f-note')
-      note.innerHTML = '计时中… <a href="#home" id="f-cancel">取消计时</a>'
-      note.querySelector('#f-cancel').addEventListener('click', e => {
-        e.preventDefault(); SD.timers.stop('feed'); location.hash = '#home'
-      })
+      el.querySelector('#f-cancel-btn').hidden = false
+      el.querySelector('#f-note').textContent = '计时中 · 切页不影响，随时回来停止'
       el.querySelector('#f-clock').textContent = SD.time.fmtClock(SD.timers.elapsed(t))
     }
     const resume = SD.timers.get('feed')   // 切走再回来：恢复运行中状态
     if (resume) paintRunning(resume)
     armFormClock()
+    /* 取消：安静次级按钮；≥3 分钟二次确认防误触（长时间睡眠计时误触损失大） */
+    el.querySelector('#f-cancel-btn').addEventListener('click', () => {
+      const t = SD.timers.get('feed')
+      const mins = t ? SD.time.clockMinutes(SD.timers.elapsed(t)) : 0
+      const doCancel = () => { SD.timers.stop('feed'); SD.ui.toast('已取消计时'); feedForm(el) }
+      if (mins >= 3) SD.ui.confirm(`已计时 ${mins} 分钟，取消将不保存这段记录——确定取消？`, doCancel, { danger: true, okText: '取消计时' })
+      else doCancel()
+    })
 
     el.querySelectorAll('#f-method-seg .seg-btn').forEach(b => b.addEventListener('click', () => {
       if (isRunning()) return SD.ui.toast('计时中，请先停止或取消')
@@ -412,7 +420,7 @@ SD.views = (() => {
       } else {
         SD.timers.stop('feed')
         const mins = SD.time.clockMinutes(SD.timers.elapsed(t))
-        if (mins < 1) return SD.ui.toast('不足 1 分钟，未记录（点「取消计时」放弃）')
+        if (mins < 1) { SD.ui.toast('不足 1 分钟，未记录（点「取消计时」放弃）'); return feedForm(el) }
         SD.store.addRecord({ type: 'feed', method: 'nurse', date: t.startDate, time: t.startStr, side: t.side, minutes: mins })
         location.hash = '#feed'
       }
@@ -464,8 +472,9 @@ SD.views = (() => {
           <button class="seg-btn" data-mode="manual">✍️ 手动</button>
         </div>
         <div id="sl-timer">
-          <div class="timer-face" id="sl-clock">00:00</div>
+          <div class="timer-face idle" id="sl-face"><span class="timer-dot" aria-hidden="true"></span><span id="sl-clock">00:00</span></div>
           <button class="btn primary-big" id="sl-go">🌙 开始睡觉</button>
+          <button class="secondary-big" id="sl-cancel-btn" hidden>取消计时</button>
           <p class="note" id="sl-note"></p>
         </div>
         <div id="sl-manual" hidden>
@@ -479,18 +488,24 @@ SD.views = (() => {
     const isRunning = () => !!SD.timers.get('sleep')
     const paintRunning = t => {
       el.querySelectorAll('[data-mode]').forEach(x => (x.disabled = true))
+      const face = el.querySelector('#sl-face')
+      face.classList.remove('idle'); face.classList.add('running')
       const btn = el.querySelector('#sl-go')
       btn.textContent = '☀️ 醒来了，停止记录'; btn.classList.add('rec')
-      const note = el.querySelector('#sl-note')
-      note.innerHTML = '睡觉中… <a href="#home" id="sl-cancel">取消计时</a>'
-      note.querySelector('#sl-cancel').addEventListener('click', e => {
-        e.preventDefault(); SD.timers.stop('sleep'); location.hash = '#home'
-      })
+      el.querySelector('#sl-cancel-btn').hidden = false
+      el.querySelector('#sl-note').textContent = '睡觉中 · 切页不影响，随时回来停止'
       el.querySelector('#sl-clock').textContent = SD.time.fmtClock(SD.timers.elapsed(t))
     }
     const resume = SD.timers.get('sleep')
     if (resume) paintRunning(resume)
     armFormClock()
+    el.querySelector('#sl-cancel-btn').addEventListener('click', () => {
+      const t = SD.timers.get('sleep')
+      const mins = t ? SD.time.clockMinutes(SD.timers.elapsed(t)) : 0
+      const doCancel = () => { SD.timers.stop('sleep'); SD.ui.toast('已取消计时'); sleepForm(el) }
+      if (mins >= 3) SD.ui.confirm(`已计时 ${mins} 分钟，取消将不保存这段记录——确定取消？`, doCancel, { danger: true, okText: '取消计时' })
+      else doCancel()
+    })
 
     el.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
       if (isRunning()) return SD.ui.toast('计时中，请先停止或取消')
@@ -508,7 +523,7 @@ SD.views = (() => {
       } else {
         SD.timers.stop('sleep')
         const mins = SD.time.clockMinutes(SD.timers.elapsed(t))
-        if (mins < 1) return SD.ui.toast('不足 1 分钟，未记录（点「取消计时」放弃）')
+        if (mins < 1) { SD.ui.toast('不足 1 分钟，未记录（点「取消计时」放弃）'); return sleepForm(el) }
         SD.store.addRecord({ type: 'sleep', date: t.startDate, start: t.startStr, end: SD.time.nowTime() })
         SD.ui.toast(`本次睡眠 ${(mins / 60).toFixed(1)} 小时已记录`)
         location.hash = '#feed'
