@@ -86,8 +86,37 @@ SD.app = (() => {
       document.head.appendChild(l)
       if ('serviceWorker' in navigator && location.protocol === 'https:') {
         navigator.serviceWorker.register('sw.js').catch(() => {})
+        setupAutoUpdate()
       }
     }
+  }
+
+  /* ── PWA 自动更新（standalone 无刷新按钮的解法）──
+     启动 + 回前台（10 分钟节流）主动 reg.update() 触发 sw.js 检查（绕过浏览器懒节奏）；
+     新版 SW 经 skipWaiting 立即接管 → controllerchange → 弹提示一键刷新（不静默刷新：会打断进行中的喂奶/睡眠计时） */
+  const APP_VER = 'v0.8.1'
+  let lastUpdCheck = 0
+  function setupAutoUpdate() {
+    let hadController = !!navigator.serviceWorker.controller   // 首次安装 SW 的 claim 不算「有新版」
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || SD.app._reloading) return
+      SD.app._reloading = true; SD.app._updatePrompted = true
+      SD.ui.confirm('新版本已就绪，刷新后生效。\n（进行中的喂奶/睡眠计时会中断，请先停止或确认无需保留）', () => location.reload(), { okText: '刷新' })
+    })
+    checkUpdate(false)
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(false) })
+  }
+  async function checkUpdate(manual) {
+    if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return
+    const now = Date.now()
+    if (!manual && now - lastUpdCheck < 10 * 60e3) return
+    lastUpdCheck = now
+    try {
+      const reg = await navigator.serviceWorker.getRegistration()
+      if (!reg) return
+      await reg.update()
+      if (manual) setTimeout(() => { if (!SD.app._updatePrompted && !reg.waiting) SD.ui.toast(`已是最新版本 ${APP_VER}`) }, 400)
+    } catch { if (manual) SD.ui.toast('检查更新失败（稍后再试）') }
   }
 
   function buildChildMenu() {
@@ -116,7 +145,7 @@ SD.app = (() => {
       if (location.hash === '#settings') render()   // 已在设置页时 hash 不变，手动渲染
     })
   }
-  return { start, render }
+  return { start, render, checkUpdate, APP_VER }
 })()
 
 document.addEventListener('DOMContentLoaded', () => SD.app.start())

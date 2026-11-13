@@ -1683,7 +1683,8 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
         <p></p><label class="field">从备份恢复</label><input type="file" id="s-import" accept=".json">
         <p></p><button class="btn danger" id="s-clear">清空全部数据</button>
       </div>
-      <div class="card"><p class="note">免责：疫苗排程/生长曲线/健康与用药内容均为育儿辅助参考，不构成医疗建议；EPDS 为简化自评非诊断。健康问题请咨询专业医生。</p></div>
+      <div class="card"><p class="note">免责：疫苗排程/生长曲线/健康与用药内容均为育儿辅助参考，不构成医疗建议；EPDS 为简化自评非诊断。健康问题请咨询专业医生。</p>
+        ${location.protocol === 'https:' ? `<p class="note">当前版本 ${SD.app.APP_VER}——桌面/主屏打开后无刷新按钮？新版本会自动检测并提示刷新，也可手动检查：<button class="btn ghost" id="s-upd">检查更新</button></p>` : ''}</div>
       <div class="sec-title">使用指南</div>
       <div id="help-slot"></div>`
 
@@ -1859,6 +1860,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
         SD.store.clearAll(); location.hash = '#home'
       }, { danger: true, okText: '全部清空' })
     })
+    el.querySelector('#s-upd')?.addEventListener('click', () => SD.app.checkUpdate(true))
   }
 
   /* 顶栏白噪音指示器（后台播放时显示 ♪，点击停止） */
