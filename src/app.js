@@ -77,8 +77,12 @@ SD.app = (() => {
       if (e.target.matches('input[type="date"]')) { try { e.target.showPicker() } catch {} }
     })
     render()
-    // F2 云同步：开启且已配码时，启动静默拉取合并（失败不打扰）
-    if (SD.state.sync && SD.state.sync.room) SD.sync.autoPull()
+    // F2 云同步：开启且已配码时，启动静默拉取 + 每 5 分钟/回前台自动拉取（失败不打扰）
+    if (SD.state.sync && SD.state.sync.room) {
+      SD.sync.autoPull()
+      setInterval(() => { if (!document.hidden) SD.sync.autoPull() }, 5 * 60e3)
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) SD.sync.autoPull() })
+    }
     // PWA：仅网络协议下启用（manifest 动态注入 + SW 仅 https），file:// 双击完全不受影响
     if (location.protocol === 'http:' || location.protocol === 'https:') {
       const l = document.createElement('link')

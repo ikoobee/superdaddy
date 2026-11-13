@@ -1745,16 +1745,29 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
         SD.state.sync = {}; SD.store.save(); settings(el)
       })
     })
+    /* 首次配码（创建/加入）后立即自动同步一次：用户预期「加入即有数据」 */
+    const runFirstSync = () => {
+      const b = el.querySelector('#fam-sync')
+      if (b) { b.disabled = true; b.textContent = '同步中…' }
+      SD.sync.syncNow()
+        .then(st => {
+          SD.ui.toast(st.recordsAdded || st.recordsUpdated ? `同步完成：并入 ${st.recordsAdded} 条 · 更新 ${st.recordsUpdated} 条` : '同步完成')
+          settings(el); SD.app.render()
+        })
+        .catch(err => { SD.ui.toast('自动同步失败：' + (err.message || '网络问题') + '——可点「立即同步」重试'); settings(el) })
+    }
     el.querySelector('#fam-gencode')?.addEventListener('click', () => {
       const code = SD.sync.genCode()
       SD.state.sync = { ...code, lastPull: null, lastPush: null }
       SD.store.save(); settings(el)
+      runFirstSync()   // 把本机数据推上中转，家人加入即能拉到
     })
     el.querySelector('#fam-join')?.addEventListener('click', () => {
       const parsed = SD.sync.parseCode(el.querySelector('#fam-joincode').value)
       if (!parsed) return SD.ui.toast('同步码格式不对（应为 房间码/密钥）')
       SD.state.sync = { ...parsed, lastPull: null, lastPush: null }
       SD.store.save(); settings(el)
+      runFirstSync()   // 加入即拉取家人数据（并回推本机记录）
     })
     el.querySelector('#fam-copycode')?.addEventListener('click', () => {
       const code = `${SD.state.sync.room}/${SD.state.sync.pass}`

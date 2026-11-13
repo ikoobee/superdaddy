@@ -47,6 +47,7 @@ SD.store = (() => {
         ...rec,
       })
       save()
+      SD.sync?.schedulePush?.()   // 云同步开启时防抖自动同步
     },
     removeRecord(id) {
       SD.state.records = SD.state.records.filter(r => r.id !== id)
@@ -54,6 +55,7 @@ SD.store = (() => {
       if (id && !(SD.state.deletedIds || []).some(t => t.id === id))
         (SD.state.deletedIds = SD.state.deletedIds || []).push({ id, at: new Date().toISOString() })
       save()
+      SD.sync?.schedulePush?.()
     },
     vaccineDone(childId) {
       const id = childId || SD.state.activeId

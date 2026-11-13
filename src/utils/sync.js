@@ -95,5 +95,15 @@ SD.sync = (() => {
     } catch { /* 静默 */ }
   }
 
-  return { encryptJSON, decryptJSON, genCode, parseCode, syncNow, autoPull, RELAY }
+  /* 记录变化 → 20 秒防抖自动同步（拉取合并→推送，避免空房间推送覆盖家人未拉取的数据）；失败静默等下次 */
+  let pushTimer = null
+  function schedulePush() {
+    if (!SD.state?.sync?.room) return
+    clearTimeout(pushTimer)
+    pushTimer = setTimeout(async () => {
+      try { await syncNow() } catch { /* 静默：下次记录变化/手动同步再试 */ }
+    }, 20000)
+  }
+
+  return { encryptJSON, decryptJSON, genCode, parseCode, syncNow, autoPull, schedulePush, RELAY }
 })()
