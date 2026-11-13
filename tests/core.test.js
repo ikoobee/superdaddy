@@ -125,6 +125,22 @@ describe('summary: 今日汇总', () => {
     assert.equal(SD.summary.sleepMin('23:00', '01:30'), 150); // 跨午夜按入睡日 +24h
     assert.equal(SD.summary.sleepMin('09:00', '09:00'), 0);
   });
+  describe('记录人显示（authorName）', () => {
+    const fam = { members: [{ id: 'm1', name: '妈妈' }, { id: 'm2', name: '爸爸' }], selfId: 'm1' }
+    it('未署名或未开家庭 → null（不显示徽标）', () => {
+      assert.equal(SD.summary.authorName({ type: 'pee' }, fam), null)
+      assert.equal(SD.summary.authorName({ type: 'pee', by: 'm1' }, null), null)
+    })
+    it('实时联动：成员改名后历史记录显示最新称呼', () => {
+      assert.equal(SD.summary.authorName({ by: 'm1' }, fam), '妈妈')
+      const renamed = { ...fam, members: [{ id: 'm1', name: '妈咪' }] }
+      assert.equal(SD.summary.authorName({ by: 'm1' }, renamed), '妈咪')
+    })
+    it('成员已删：回退记录时快照 byName；无快照兜底「家人」（替换问号）', () => {
+      assert.equal(SD.summary.authorName({ by: 'gone', byName: '奶奶' }, fam), '奶奶')
+      assert.equal(SD.summary.authorName({ by: 'gone' }, fam), '家人')
+    })
+  });
 });
 
 describe('summary: 时间轴分组排序', () => {

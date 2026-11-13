@@ -5,6 +5,17 @@ const feedMethod = f => f.method || (Number(f.ml) > 0 ? 'formula' : 'nurse')
 SD.summary = {
   feedMethod,
 
+  /**
+   * 记录人显示名（时间轴徽标）：
+   * 实时成员名（改名联动）→ 记录时快照 byName（成员被删后显示当时称呼）→ '家人'（极老孤儿署名，替换问号）。
+   * 未署名（旧数据/单人模式）返回 null = 不显示。
+   */
+  authorName(r, family) {
+    if (!family || !r.by) return null
+    const m = (family.members || []).find(x => x.id === r.by)
+    return m ? m.name : (r.byName || '家人')
+  },
+
   /** 单段睡眠分钟数：跨午夜（end < start）按入睡日 +24h；同时刻 = 0 */
   sleepMin(start, end) {
     const toMin = hm => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m }

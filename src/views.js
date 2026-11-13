@@ -566,7 +566,7 @@ SD.views = (() => {
     const days = SD.summary.timelineDays(recs, 5)
     el.innerHTML = days.length
       ? days.map(d => `<div class="sec-title">${d.date}</div>` + d.items.map(r => `
-          <div class="tl-item"><span class="icon">${iconOf(r)}</span><span class="desc">${esc(LABEL(r))}${SD.state.family && r.by ? `<span class="note"> · ${esc(SD.state.family.members.find(m => m.id === r.by)?.name || '?')}</span>` : ''}</span>
+          <div class="tl-item"><span class="icon">${iconOf(r)}</span><span class="desc">${esc(LABEL(r))}${(() => { const an = SD.summary.authorName(r, SD.state.family); return an ? `<span class="note"> · ${esc(an)}</span>` : '' })()}</span>
           <span class="t">${r.time || r.start || ''}</span><button class="del" data-id="${r.id}">✕</button></div>`).join('')).join('')
       : `<div class="empty"><p>还没有记录</p><p class="note">回首页用快捷按钮打卡</p></div>`
     el.querySelectorAll('.del').forEach(b => b.addEventListener('click', () => { SD.store.removeRecord(b.dataset.id); feed(el) }))
@@ -1426,10 +1426,13 @@ SD.views = (() => {
 今日喂养：共 ${s.feedCount} 次（亲喂 ${s.nurseCount} · 奶粉 ${s.formulaCount}${s.formulaMl ? ` · 奶粉共 ${s.formulaMl}ml` : ''}）
 今日睡眠：${(s.sleepMinutes / 60).toFixed(1)} 小时
 尿 ${s.pee} 次 / 便 ${s.poop} 次 / 维生素D ${s.vitd ? '已补' : '❗未补'}
-${(() => {   // 家庭模式：按成员署名统计今日记录
+${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名归入「家人」）
   if (!SD.state.family) return ''
   const today = SD.time.todayStr(), recs = SD.store.recordsOf().filter(r => r.date === today)
+  const known = new Set(SD.state.family.members.map(m => m.id))
+  const orphan = recs.filter(r => r.by && !known.has(r.by)).length
   const parts = SD.state.family.members.map(m => `${m.name} ${recs.filter(r => r.by === m.id).length}`).filter(x => !/\s0$/.test(x))
+  if (orphan) parts.push(`家人 ${orphan}`)
   return parts.length ? `今日记录（按人）：${parts.join(' · ')}\n` : ''
 })()}${watching.length ? `辅食观察中：${watching.map(f => f.name).join('、')}\n` : ''}${next ? `下一剂疫苗：${next.name} 第${next.dose}剂（${next.sched}）\n` : ''}
 —— 由超级奶爸工作台本地生成，数据未上传`
@@ -1788,7 +1791,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
       ov.innerHTML = `<div class="modal"><h3>修改成员</h3>
         <label class="field">称呼</label><input type="text" id="rn-name" maxlength="8" value="${esc(m.name)}">
         <label class="field">角色</label><select id="rn-role">${roleOptions(m.role)}</select>
-        <p class="note" style="display:block">历史记录的署名不受影响；改名会同步到家人设备。</p>
+        <p class="note" style="display:block">改名后所有记录（含历史）立即显示新称呼，并同步到家人设备；已删除成员的旧记录显示其被删时的称呼。</p>
         <p></p><div class="row"><button class="btn ghost" id="rn-cancel">取消</button><button class="btn" id="rn-save">保存</button></div></div>`
       document.body.appendChild(ov)
       ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })

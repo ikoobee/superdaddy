@@ -42,9 +42,11 @@ SD.store = (() => {
       return SD.state.records.filter(r => (r.childId || 'c1') === id)
     },
     addRecord(rec) {
+      /* 家庭模式署名：by=id（实时联动改名）+ byName=落库时称呼快照（成员被删后仍可显示） */
+      const self = SD.state.family?.selfId ? SD.state.family.members.find(m => m.id === SD.state.family.selfId) : null
       SD.state.records.push({
         id: uid(), childId: SD.state.activeId, updatedAt: new Date().toISOString(),
-        ...(SD.state.family?.selfId ? { by: SD.state.family.selfId } : {}),   // 家庭模式署名
+        ...(self ? { by: self.id, byName: self.name } : {}),
         ...rec,
       })
       save()
