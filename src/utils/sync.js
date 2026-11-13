@@ -1,7 +1,7 @@
 /* F2 端到端加密同步：密钥派生 + 加解密（WebCrypto，浏览器/Node 同构）+ 家庭码 + 中转客户端
    安全模型：明文与密钥永不出设备；中转服务器（Cloudflare Worker+KV）只存密文；房间码=KV 键（不可猜测），密钥=口令派生（永不上送） */
 SD.sync = (() => {
-  const RELAY = 'https://superdaddy-sync.ikoobee.workers.dev'   // 自建可改：部署 sync-worker/ 后替换
+  const RELAY = 'https://superdaddy-sync.ikoobee.com'   // 自建可改：部署 sync-worker/ 后替换（workers.dev 域在大陆不可达，用自定义域）
   const ALPHA = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'              // 无 0/1/I/O/L 易混字符
   const enc = new TextEncoder(), dec = new TextDecoder()
 
