@@ -72,9 +72,9 @@ SD.features = (() => {
 
 /** v1 → v2 状态迁移（纯函数，store 调用）：单孩 → children[] + 按 childId 归档 */
 SD.storeMigrate = state => {
-  const base = { version: 2, children: [], activeId: null, records: [], vaccineDoneByChild: {}, epdsHistory: [], tasks: [], feedRemind: true, feedNotify: false, family: null, deletedIds: [] }
+  const base = { version: 2, children: [], activeId: null, records: [], vaccineDoneByChild: {}, epdsHistory: [], tasks: [], feedRemind: true, feedNotify: false, family: null, deletedIds: [], sync: null }
   if (!state) return base
-  if (state.version === 2) return { tasks: [], feedRemind: true, feedNotify: false, family: null, deletedIds: [], ...state }   // 补默认字段（老 v2 备份）
+  if (state.version === 2) return { tasks: [], feedRemind: true, feedNotify: false, family: null, deletedIds: [], sync: null, ...state }   // 补默认字段（老 v2 备份）
   // v1: { child, records, vaccineDone }
   const children = state.child ? [{ id: 'c1', ...state.child }] : []
   const activeId = children[0]?.id ?? null

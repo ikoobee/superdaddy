@@ -1,0 +1,8 @@
+name = "superdaddy-sync"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+# KV 绑定：部署前先 `npx wrangler kv namespace create SYNC` 并把 id 填到下方
+[[kv_namespaces]]
+binding = "KV"
+id = "TO_BE_CREATED"

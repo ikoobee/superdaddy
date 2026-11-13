@@ -1653,6 +1653,20 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
             <button class="btn ghost" id="fam-add">＋ 添加</button>
           </div>
           <p class="note">家人各自记录的汇总方式：导出备份发给对方 → 对方在「从备份恢复」选<b>合并导入</b>（自动按记录去重，删除 30 天内不会被复活）。单人模式行为与从前完全一致。</p>
+          <p></p>
+          <label class="field" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fam-cloud" ${st.sync ? 'checked' : ''}> ☁️ 云同步（端到端加密中转）</label>
+          ${st.sync ? (st.sync.room ? `
+            <p class="note">开启中：数据以<b>密文</b>上传 Cloudflare 中转与家人共享——服务器无法解密（零知识），密钥只在本机。</p>
+            <label class="field">家庭同步码（发给家人，在其设备「加入」处粘贴）</label>
+            <div class="row"><input type="text" readonly value="${st.sync.room}/${st.sync.pass}" style="flex:1" onfocus="this.select()"><button class="btn ghost" id="fam-copycode">复制</button></div>
+            <p class="note">上次同步：${st.sync.lastPull ? SD.time.fmtAgo(st.sync.lastPull) : '从未'}${st.sync.lastPush ? ' · 推送 ' + SD.time.fmtAgo(st.sync.lastPush) : ''}</p>
+            <p></p><button class="btn" id="fam-sync">🔄 立即同步</button>
+          ` : `
+            <p></p>
+            <div class="row"><button class="btn ghost" id="fam-gencode" style="flex:1">创建新的家庭同步码</button></div>
+            <p class="note">或加入家人已创建的：</p>
+            <div class="row"><input type="text" id="fam-joincode" placeholder="粘贴同步码（房间码/密钥）" style="flex:1"><button class="btn ghost" id="fam-join">加入</button></div>
+          `) : `<p class="note">需与家人自动共享？开启后经 Cloudflare 中转上传<b>加密</b>数据（端到端，服务器零知识）。</p>`}
         ` : `<p class="note">多位家人各自手机记录？切换到家庭模式：记录署名 + 备份合并导入，数据仍全部本地。</p>`}
       </div>
       <div class="sec-title">提醒</div>
@@ -1701,6 +1715,63 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录
       if (f.selfId === b.dataset.mrm) f.selfId = f.members[0].id
       SD.store.save(); settings(el)
     }))
+    /* F2 云同步：开关（明确告知上传密文）→ 配码（创建/加入）→ 手动同步 */
+    el.querySelector('#fam-cloud')?.addEventListener('change', e => {
+      if (!e.target.checked) {
+        SD.ui.confirm('关闭云同步？\n\n本机数据完整保留，只是不再上传/拉取；家人设备的旧密文 90 天无活动后自动过期。', () => {
+          SD.state.sync = null; SD.store.save(); settings(el)
+        })
+        return
+      }
+      /* 用户要求：切换开关时明确说明——共享数据需上传加密数据到后端 */
+      document.getElementById('cloud-consent')?.remove()
+      const ov = document.createElement('div')
+      ov.className = 'overlay'; ov.id = 'cloud-consent'
+      ov.innerHTML = `<div class="modal"><h3>开启云同步前请了解</h3>
+        <p class="note" style="display:block">为与家人共享数据，你的育儿记录将以<b>端到端加密（AES-256-GCM 密文）</b>上传到 Cloudflare 中转服务器：</p>
+        <ul class="list" style="margin:8px 0">
+          <li>⚠️ <b>数据会上传到后端</b>——但只有密文，服务器无法解密（零知识）</li>
+          <li>🔒 加密密钥只保存在你与家人的设备上，永不上传</li>
+          <li>📤 关闭同步即可停止上传；本地数据完整可随时导出脱离</li>
+          <li>🗑 中转密文 90 天无同步活动自动清除</li>
+        </ul>
+        <p></p><div class="row"><button class="btn ghost" id="cc-no">取消</button><button class="btn" id="cc-yes">我已了解，开启</button></div></div>`
+      document.body.appendChild(ov)
+      ov.addEventListener('click', ev => { if (ev.target === ov) { ov.remove(); e.target.checked = false } })
+      ov.querySelector('#cc-no').addEventListener('click', () => { ov.remove(); e.target.checked = false })
+      ov.querySelector('#cc-yes').addEventListener('click', () => {
+        ov.remove()
+        SD.state.sync = {}; SD.store.save(); settings(el)
+      })
+    })
+    el.querySelector('#fam-gencode')?.addEventListener('click', () => {
+      const code = SD.sync.genCode()
+      SD.state.sync = { ...code, lastPull: null, lastPush: null }
+      SD.store.save(); settings(el)
+    })
+    el.querySelector('#fam-join')?.addEventListener('click', () => {
+      const parsed = SD.sync.parseCode(el.querySelector('#fam-joincode').value)
+      if (!parsed) return SD.ui.toast('同步码格式不对（应为 房间码/密钥）')
+      SD.state.sync = { ...parsed, lastPull: null, lastPush: null }
+      SD.store.save(); settings(el)
+    })
+    el.querySelector('#fam-copycode')?.addEventListener('click', () => {
+      const code = `${SD.state.sync.room}/${SD.state.sync.pass}`
+      navigator.clipboard?.writeText(code).then(() => SD.ui.toast('同步码已复制，发给家人吧'))
+        .catch(() => SD.ui.toast(code))
+    })
+    el.querySelector('#fam-sync')?.addEventListener('click', async btn => {
+      const b = el.querySelector('#fam-sync'), old = b.textContent
+      b.disabled = true; b.textContent = '同步中…'
+      try {
+        const st = await SD.sync.syncNow()
+        SD.ui.toast(st.recordsAdded || st.recordsUpdated ? `同步完成：并入 ${st.recordsAdded} 条 · 更新 ${st.recordsUpdated} 条` : '同步完成：已与家人数据一致')
+        settings(el); SD.app.render()
+      } catch (err) {
+        SD.ui.toast('同步失败：' + (err.message || '网络问题或密钥不符'))
+        b.disabled = false; b.textContent = old
+      }
+    })
     el.querySelector('#s-feednotify').addEventListener('change', e => {
       const on = () => { SD.state.feedNotify = true; SD.store.save(); SD.ui.toast('到时通知已开启（仅应用打开期间）') }
       const off = msg => { e.target.checked = false; SD.state.feedNotify = false; SD.store.save(); if (msg) SD.ui.toast(msg) }
