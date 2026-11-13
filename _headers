@@ -1,0 +1,5 @@
+# sw.js 必须每次校验（SW 更新检查的入口，不能吃边缘缓存）
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate

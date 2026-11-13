@@ -9,3 +9,7 @@ node_modules/
 CLAUDE.md
 google*.html
 tools/
+
+# wrangler 本地状态
+.wrangler/
+sync-worker/.wrangler/

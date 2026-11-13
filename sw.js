@@ -1,5 +1,5 @@
 /* Service Worker —— cache-first，仅部署版生效（https） */
-const CACHE = 'superdaddy-v0.25'
+const CACHE = 'superdaddy-v0.26'
 const CORE = [
   './', 'index.html',
   'styles/tokens.css', 'styles/app.css',
@@ -14,7 +14,16 @@ const CORE = [
 ]
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()))
+  /* 预缓存一律 cache:'reload' 绕过 HTTP 缓存——否则新 SW 可能装进 4h 缓存窗内的旧资源（版本串滞后的根因） */
+  e.waitUntil(
+    caches.open(CACHE).then(async c => {
+      await Promise.all(CORE.map(async u => {
+        const res = await fetch(u, { cache: 'reload' })
+        if (!res.ok) throw new Error('precache failed: ' + u)
+        await c.put(u, res)
+      }))
+    }).then(() => self.skipWaiting()),
+  )
 })
 self.addEventListener('activate', e => {
   e.waitUntil(
