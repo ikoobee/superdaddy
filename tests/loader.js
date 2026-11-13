@@ -24,6 +24,7 @@ export function loadSD() {
     'src/utils/feedplan.js',
     'src/utils/merge.js',
     'src/utils/sync.js',
+    'src/utils/timers.js',
     'src/utils/cal.js',
     'src/utils/preg.js',
     'src/data/sleep_ref.data.js',
