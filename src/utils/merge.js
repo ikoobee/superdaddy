@@ -47,8 +47,12 @@ SD.merge = (() => {
     for (const t of [...(remote.tasks || []), ...(local.tasks || [])]) taskMap.set(t.id, t)
 
     /* family：selfId/creator/localIds 设备私有；members 并集 + 同 id 改名传播 + 移除墓碑传播；
-       本机身份被移除时回落到本机仍存的身份，绝不冒认他人身份（无则置空待重设） */
+       本机身份被移除时回落到本机仍存的身份，绝不冒认他人身份（无则置空待重设）；
+       本机未开家庭而远端有（加入流程先同步后设身份）：采纳远端成员名单，设备字段归零 */
     let family = local.family || null
+    if (!family && remote.family) {
+      family = { members: (remote.family.members || []).filter(m => !(remote.family.removedMembers || []).includes(m.id)), selfId: null, creator: false, localIds: [] }
+    }
     if (family && remote.family) {
       const gone = new Set([...(family.removedMembers || []), ...(remote.family.removedMembers || [])])
       const mMap = new Map()

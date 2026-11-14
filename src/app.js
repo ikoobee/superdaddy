@@ -58,6 +58,11 @@ SD.app = (() => {
 
   function start() {
     SD.store.load()
+    /* 设备持久标识：家庭身份复用（重新加入同一家庭不新建成员） */
+    if (!SD.state.deviceId) {
+      SD.state.deviceId = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+      SD.store.save()
+    }
     window.addEventListener('hashchange', render)
     document.getElementById('back-btn').addEventListener('click', () => (location.hash = '#home'))
     // 顶栏白噪音指示器：后台播放中显示 ♪，点击停止
@@ -102,7 +107,7 @@ SD.app = (() => {
   /* ── PWA 自动更新（standalone 无刷新按钮的解法）──
      启动 + 回前台（10 分钟节流）主动 reg.update() 触发 sw.js 检查（绕过浏览器懒节奏）；
      新版 SW 经 skipWaiting 立即接管 → controllerchange → 弹提示一键刷新（不静默刷新：会打断进行中的喂奶/睡眠计时） */
-  const APP_VER = 'v0.9.5'
+  const APP_VER = 'v0.9.6'
   let lastUpdCheck = 0
   function setupAutoUpdate() {
     let hadController = !!navigator.serviceWorker.controller   // 首次安装 SW 的 claim 不算「有新版」

@@ -146,6 +146,22 @@ describe('merge: 集合并集与设备私有字段', () => {
     assert.deepEqual(state.family.localIds, [])
   })
 
+  it('本机未开家庭而远端有：采纳远端成员名单，设备字段归零（加入流程先同步后设身份）', () => {
+    const local = { ...base(), family: null }
+    const remote = { ...base(), family: { members: [{ id: 'm1', name: '妈妈', deviceId: 'dA' }, { id: 'm2', name: '爸爸', deviceId: 'dB' }], selfId: 'm1', creator: true, localIds: ['m1'] } }
+    const { state } = SD.merge.mergeState(local, remote)
+    assert.equal(state.family.members.length, 2)      // 名单采纳
+    assert.equal(state.family.selfId, null)           // 设备字段归零，待本机设置
+    assert.equal(state.family.creator, false)
+    assert.deepEqual(state.family.localIds, [])
+  })
+
+  it('ownMember：按 deviceId 找回本机旧身份（重新加入复用，不新建）', () => {
+    const family = { members: [{ id: 'm2', name: '爸爸', deviceId: 'dB' }, { id: 'm1', name: '妈妈', deviceId: 'dA' }] }
+    assert.equal(SD.summary.ownMember(family, 'dA')?.id, 'm1')
+    assert.equal(SD.summary.ownMember(family, 'dZ'), null)
+  })
+
   it('合并后修复 activeId：本机从未有宝宝（null）→ 取合并结果第一个孩子（B 端加入同步场景）', () => {
     const local = { ...base(), children: [], activeId: null }        // 无痕新站：从未建宝宝
     const remote = { ...base() }                                      // A 端：c1 + activeId c1

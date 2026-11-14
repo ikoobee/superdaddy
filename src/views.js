@@ -1721,7 +1721,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
             <div class="row"><input type="text" readonly value="${st.sync.room}/${st.sync.pass}" style="flex:1" onfocus="this.select()"><button class="btn ghost" id="fam-copycode">复制</button></div>
             <p class="note">上次同步：${st.sync.lastPull ? SD.time.fmtAgo(st.sync.lastPull) : '从未'}${st.sync.lastPush ? ' · 推送 ' + SD.time.fmtAgo(st.sync.lastPush) : ''}</p>
             <p></p><button class="btn" id="fam-sync">🔄 立即同步</button>
-            <p></p><button class="btn ghost" id="fam-joinbtn2">改为加入家人分享的同步码</button>
+            <p class="note">要换到别的家庭：退出家庭模式后重新「加入家庭」即可。</p>
           ` : `
             <p></p>
             <div class="row"><button class="btn ghost" id="fam-gencode" style="flex:1">创建新的家庭同步码</button><button class="btn ghost" id="fam-joinbtn" style="flex:1">🔗 加入（粘贴同步码）</button></div>
@@ -1781,7 +1781,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         const name = ov.querySelector('#id-name').value.trim()
         if (!name) return SD.ui.toast('请填一个称呼（家人一看就懂的那种）')
         const id = 'm' + Date.now().toString(36)
-        const member = { id, name, role: ov.querySelector('#id-role').value }
+        const member = { id, name, role: ov.querySelector('#id-role').value, deviceId: SD.state.deviceId }   // deviceId：重新加入时复用身份
         if (creating) SD.state.family = { members: [member], selfId: id, creator: opts.creator, localIds: [id] }
         else { SD.state.family.members.push(member); SD.state.family.localIds.push(id); SD.state.family.selfId = id }
         const claimed = SD.summary.claimUnsigned(SD.state.records, member)
@@ -1870,7 +1870,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
       ov.querySelector('#cc-no').addEventListener('click', cancel)
       ov.querySelector('#cc-yes').addEventListener('click', () => { ov.remove(); onYes() })
     }
-    /* 加入家庭一步直达：粘贴同步码 →（未开家庭先设身份）→ 加密告知 → 首同步 */
+    /* 加入家庭：粘贴同步码 → 加密告知 → 首同步拉家人数据 → deviceId 复用旧身份（欢迎回来）或引导设身份 */
     const openJoinModal = () => {
       document.getElementById('join-modal')?.remove()
       const ov = document.createElement('div')
@@ -1886,21 +1886,43 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         const parsed = SD.sync.parseCode(ov.querySelector('#jm-code').value)
         if (!parsed) return SD.ui.toast('同步码格式不对（应为 房间码/密钥）')
         ov.remove()
-        const applyCode = () => {
-          if (!SD.state.sync)
-            return openConsent(() => { SD.state.sync = { ...parsed, lastPull: null, lastPush: null }; SD.store.save(); settings(el); runFirstSync() })
-          SD.state.sync = { ...parsed, lastPull: null, lastPush: null }; SD.store.save(); settings(el); runFirstSync()
+        const go = () => {
+          SD.state.sync = { ...parsed, lastPull: null, lastPush: null }
+          SD.store.save(); settings(el)
+          joinSync()
         }
-        if (!SD.state.family) return openIdentityModal(applyCode, { creator: false })   // 加入设备：先设本机身份
-        applyCode()
+        if (!SD.state.sync) return openConsent(go)
+        go()
       })
       ov.querySelector('#jm-code').focus()
     }
+    const joinSync = () => {
+      const preChildIds = new Set(SD.state.children.map(c => c.id))
+      const b = el.querySelector('#fam-sync')
+      if (b) { b.disabled = true; b.textContent = '同步中…' }
+      SD.sync.syncNow()
+        .then(() => {
+          if (!SD.state.family) SD.state.family = { members: [], selfId: null, creator: false, localIds: [] }
+          const mine = SD.summary.ownMember(SD.state.family, SD.state.deviceId)
+          if (mine) {
+            const f = SD.state.family
+            f.selfId = mine.id; f.creator = false
+            f.localIds = [mine.id, ...f.localIds.filter(i => i !== mine.id)]
+            SD.store.save()
+            SD.ui.toast(`欢迎回来「${mine.name}」`)
+          } else {
+            SD.store.save()
+          }
+          const arrived = SD.state.children.filter(c => !preChildIds.has(c.id))
+          const localOnly = SD.state.children.filter(c => preChildIds.has(c.id))
+          if (preChildIds.size === 1 && arrived.length === 1 && localOnly.length === 1)
+            return offerChildMerge(arrived[0], localOnly[0])
+          settings(el); SD.app.render()
+          if (!mine) { SD.ui.toast('已拉取家人数据，请设置本机身份'); openIdentityModal(null, { creator: false }) }
+        })
+        .catch(err => { SD.ui.toast('加入同步失败：' + (err.message || '网络问题') + '——可点「立即同步」重试'); settings(el) })
+    }
     el.querySelector('#fam-joinbtn')?.addEventListener('click', openJoinModal)
-    /* 已有码但想加入别人的家庭（如误先创建）：换码覆盖并首同步 */
-    el.querySelector('#fam-joinbtn2')?.addEventListener('click', () => {
-      SD.ui.confirm('加入其他家庭？\n\n将用新的同步码替换当前家庭码（本机数据保留，合并进新家庭）。', () => openJoinModal())
-    })
     /* F2 云同步开关（明确告知上传密文）；开启即自动创建家庭码并发起首同步 */
     el.querySelector('#fam-cloud')?.addEventListener('change', e => {
       if (!e.target.checked) {

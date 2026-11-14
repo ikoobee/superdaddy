@@ -16,6 +16,12 @@ SD.summary = {
     return m ? m.name : (r.byName || '家人')
   },
 
+  /** 本设备此前创建过的成员（deviceId 匹配）——重新加入同一家庭时复用身份，防止成员堆积 */
+  ownMember(family, deviceId) {
+    if (!family || !deviceId) return null
+    return (family.members || []).find(m => m.deviceId === deviceId) || null
+  },
+
   /**
    * 认领未署名记录（开启家庭/加入家庭/切换身份时）：by 为空的本机历史记录归入指定成员。
    * 就地修改（records 是状态对象）；他人已署名的不动；返回认领条数。
