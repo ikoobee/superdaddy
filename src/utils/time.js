@@ -36,4 +36,16 @@ SD.time = {
   clockMinutes(sec) {
     return Math.round(sec / 60)
   },
+
+  /** 补录时刻校验：日期不得晚于今天；同日时刻不得晚于当前分钟。now 可注入供测试 */
+  validateWhen(date, time, now = new Date()) {
+    const pad = n => String(n).padStart(2, '0')
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    if (!date || date > today) return { ok: false, msg: '日期不能晚于今天' }
+    if (time && date === today) {
+      const [h, m] = time.split(':').map(Number), cur = now.getHours() * 60 + now.getMinutes()
+      if (Number.isFinite(h) && h * 60 + m > cur) return { ok: false, msg: '时间不能是未来时刻' }
+    }
+    return { ok: true }
+  },
 }

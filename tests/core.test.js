@@ -134,6 +134,15 @@ describe('summary: 今日汇总', () => {
     assert.equal(state.activeId, 'cR')
   })
 
+  it('validateWhen：过去合法 / 未来时刻拒绝 / 未来日期拒绝 / 时间缺省合法', () => {
+    const now = new Date('2026-11-15T10:00:00')
+    assert.equal(SD.time.validateWhen('2026-11-14', '23:00', now).ok, true)          // 昨天
+    assert.equal(SD.time.validateWhen('2026-11-15', '09:30', now).ok, true)          // 今天早于现在
+    assert.equal(SD.time.validateWhen('2026-11-15', '10:01', now).ok, false)         // 未来时刻（含 1 分钟容差边界外）
+    assert.equal(SD.time.validateWhen('2026-11-16', '08:00', now).ok, false)         // 未来日期
+    assert.equal(SD.time.validateWhen('2026-11-15', '', now).ok, true)               // 无时间只查日期
+  })
+
   it('跨午夜睡眠（start>end）计入当日', () => {
     const s = summarizeDay([
       { type: 'sleep', date: '2026-09-15', start: '23:00', end: '01:30' },

@@ -146,6 +146,15 @@ describe('merge: 集合并集与设备私有字段', () => {
     assert.deepEqual(state.family.localIds, [])
   })
 
+  it('宝宝档案 LWW：updatedAt 新者整胜（本机改生日未被推送时不被远端旧值回滚）', () => {
+    const local = { ...base(), children: [{ id: 'c1', name: 'A', birth: '2026-08-16', updatedAt: '2026-11-15T12:00:00Z' }] }   // 本机刚纠正的生日
+    const remote = { ...base(), children: [{ id: 'c1', name: 'A', birth: '2026-08-15', updatedAt: '2026-11-15T11:00:00Z' }] }  // 远端旧值（非空——现行规则会回滚）
+    const { state } = SD.merge.mergeState(local, remote)
+    assert.equal(state.children[0].birth, '2026-08-16')            // 新者胜
+    const { state: s2 } = SD.merge.mergeState(remote, local)
+    assert.equal(s2.children[0].birth, '2026-08-16')               // 反向同样：新值传播
+  })
+
   it('宝宝移除墓碑：本机丢弃的档案不会被远端快照复活，且传播给远端', () => {
     const now = new Date().toISOString()
     const local = {

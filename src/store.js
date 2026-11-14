@@ -27,7 +27,9 @@ SD.store = (() => {
     registerBirth(id, birth) {
       const c = SD.state.children.find(x => x.id === id)
       if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(birth)) return false
-      c.birth = birth; save(); return true
+      c.birth = birth
+      c.updatedAt = new Date().toISOString()   // 档案 LWW：跨设备合并按此判新旧
+      save(); return true
     },
     switchChild(id) { SD.state.activeId = id; save() },
     removeChild(id, confirmText) {

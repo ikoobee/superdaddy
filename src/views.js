@@ -448,10 +448,12 @@ SD.views = (() => {
       }
     })
     el.querySelector('#f-save').addEventListener('click', () => {
+      const date = el.querySelector('#f-date').value || SD.time.todayStr()
+      const time = el.querySelector('#f-time').value || SD.time.nowTime()
+      const chk = SD.time.validateWhen(date, time)
+      if (!chk.ok) return SD.ui.toast(chk.msg)
       SD.store.addRecord({
-        type: 'feed', method: 'nurse',
-        date: el.querySelector('#f-date').value || SD.time.todayStr(),
-        time: el.querySelector('#f-time').value || SD.time.nowTime(),
+        type: 'feed', method: 'nurse', date, time,
         side: el.querySelector('#f-side').value,
         minutes: +el.querySelector('#f-min').value || 0,
       })
@@ -460,7 +462,11 @@ SD.views = (() => {
     el.querySelector('#f-fsave').addEventListener('click', () => {
       const ml = +el.querySelector('#f-fml').value
       if (!ml || ml < 1 || ml > 500) return SD.ui.toast('请输入 1-500 之间的奶量')
-      SD.store.addRecord({ type: 'feed', method: 'formula', date: el.querySelector('#f-fdate').value || SD.time.todayStr(), time: el.querySelector('#f-ftime').value || SD.time.nowTime(), ml })
+      const date = el.querySelector('#f-fdate').value || SD.time.todayStr()
+      const time = el.querySelector('#f-ftime').value || SD.time.nowTime()
+      const chk = SD.time.validateWhen(date, time)
+      if (!chk.ok) return SD.ui.toast(chk.msg)
+      SD.store.addRecord({ type: 'feed', method: 'formula', date, time, ml })
       SD.ui.toast(`已记录奶粉 ${ml}ml`)
       location.hash = '#feed'
     })
@@ -481,7 +487,10 @@ SD.views = (() => {
     el.querySelector('#tf-save').addEventListener('click', () => {
       const v = +el.querySelector('#tf-val').value
       if (!v || v < 34 || v > 43) return SD.ui.toast('请输入 34-43 之间的体温值')
-      SD.store.addRecord({ type: 'temp', date: el.querySelector('#tf-date').value || SD.time.todayStr(), time: SD.time.nowTime(), part: el.querySelector('#tf-part').value, val: v })
+      const date = el.querySelector('#tf-date').value || SD.time.todayStr()
+      const chk = SD.time.validateWhen(date, '')
+      if (!chk.ok) return SD.ui.toast(chk.msg)
+      SD.store.addRecord({ type: 'temp', date, time: SD.time.nowTime(), part: el.querySelector('#tf-part').value, val: v })
       const st = SD.features.tempStatus(mo, v)
       if (st === 'urgent') SD.ui.toast('⚠️ 3 月龄内 ≥38℃：请立即就医', 'danger')
       else if (st === 'high') SD.ui.toast('高热 ≥38.5℃，必要时就医', 'warn')
@@ -560,7 +569,10 @@ SD.views = (() => {
       const start = el.querySelector('#s-start').value, end = el.querySelector('#s-end').value
       if (!start || !end) return SD.ui.toast('请填入睡与醒来时间')
       if (start === end) return SD.ui.toast('入睡与醒来相同——跨午夜请把醒来填为较小时间（如 23:00 → 01:30）')
-      SD.store.addRecord({ type: 'sleep', date: el.querySelector('#s-date').value || SD.time.todayStr(), start, end })
+      const date = el.querySelector('#s-date').value || SD.time.todayStr()
+      const chk = SD.time.validateWhen(date, start)   // 校验入睡时刻（醒来可能跨午夜故不校验）
+      if (!chk.ok) return SD.ui.toast(chk.msg)
+      SD.store.addRecord({ type: 'sleep', date, start, end })
       location.hash = '#feed'
     })
   }
@@ -588,14 +600,29 @@ SD.views = (() => {
 
   function feed(el) {
     if (!child()) return onboard(el)
-    // 待产包/42天清单等勾选类不进时间轴；日内按记录时间倒序（timelineDays：补录早时点落到时间位置）
-    const recs = SD.store.recordsOf().filter(r => !['bag', 'd42', 'ctmark'].includes(r.type))
-    const days = SD.summary.timelineDays(recs, 5)
-    el.innerHTML = days.length
-      ? days.map(d => `<div class="sec-title">${d.date}</div>` + d.items.map(r => `
+    /* 类型筛选 + 天数翻页状态存 el.dataset（视图重渲染保持） */
+    const FILTERS = [['all', '全部'], ['feed', '喂养'], ['sleep', '睡眠'], ['pee', '尿便'], ['other', '其他']]
+    const fkey = el.dataset.tlFilter || 'all'
+    const daysShown = +(el.dataset.tlDays || 5)
+    const match = r => fkey === 'all' ? true
+      : fkey === 'pee' ? ['pee', 'poop'].includes(r.type)
+      : fkey === 'other' ? !['feed', 'sleep', 'pee', 'poop'].includes(r.type)
+      : r.type === fkey
+    const recs = SD.store.recordsOf().filter(r => !['bag', 'd42', 'ctmark'].includes(r.type) && match(r))
+    const totalDays = [...new Set(recs.map(r => r.date))].length
+    const days = SD.summary.timelineDays(recs, daysShown)
+    el.innerHTML = `
+      <div class="seg" style="margin-bottom:12px">${FILTERS.map(([k, l]) => `<button class="seg-btn ${k === fkey ? 'on' : ''}" data-tlf="${k}">${l}</button>`).join('')}</div>
+      ${days.length
+        ? days.map(d => `<div class="sec-title">${d.date}</div>` + d.items.map(r => `
           <div class="tl-item"><span class="icon">${iconOf(r)}</span><span class="desc">${esc(LABEL(r))}${(() => { const an = SD.summary.authorName(r, SD.state.family); return an ? `<span class="note"> · ${esc(an)}</span>` : '' })()}</span>
-          <span class="t">${r.time || r.start || ''}</span><button class="del" data-id="${r.id}">✕</button></div>`).join('')).join('')
-      : `<div class="empty"><p>还没有记录</p><p class="note">回首页用快捷按钮打卡</p></div>`
+          <span class="t">${r.time || r.start || ''}</span><button class="del" data-id="${r.id}">✕</button></div>`).join('')).join('') +
+          (daysShown < totalDays ? `<p></p><button class="btn ghost" id="tl-more" style="width:100%">查看更早（还有 ${totalDays - daysShown} 天）</button>` : '')
+        : `<div class="empty"><p>还没有记录</p><p class="note">回首页用快捷按钮打卡</p></div>`}`
+    el.querySelectorAll('[data-tlf]').forEach(b => b.addEventListener('click', () => {
+      el.dataset.tlFilter = b.dataset.tlf; el.dataset.tlDays = 5; feed(el)
+    }))
+    el.querySelector('#tl-more')?.addEventListener('click', () => { el.dataset.tlDays = daysShown + 10; feed(el) })
     el.querySelectorAll('.del').forEach(b => b.addEventListener('click', () => { SD.store.removeRecord(b.dataset.id); feed(el) }))
   }
 

@@ -28,15 +28,19 @@ SD.merge = (() => {
     }
     const records = out.filter(r => !r.id || !tomb.has(r.id))
 
-    /* children 并集：同 id 时远端非空字段覆盖（档案改动传播），空值不覆盖；
+    /* children 并集 + LWW：updatedAt 新者整胜（本机改档案未推送时不被远端旧值回滚，同成员 renamedAt 方案）；
+       无时间戳退回「远端非空字段覆盖」（档案改动传播），空值不覆盖；
        removedChildren 墓碑并集过滤——丢弃/删除的档案不被远端快照复活，且删除跨设备传播 */
     const goneChild = new Set([...(local.removedChildren || []), ...(remote.removedChildren || [])])
+    const cts = c => (c.updatedAt ? new Date(c.updatedAt).getTime() : 0)
     const childMap = new Map()
     for (const c of local.children || []) if (!goneChild.has(c.id)) childMap.set(c.id, c)
     for (const c of remote.children || []) {
       if (goneChild.has(c.id)) continue
       const e = childMap.get(c.id)
-      if (!e) childMap.set(c.id, c)
+      if (!e) { childMap.set(c.id, c); continue }
+      if (cts(c) > cts(e)) childMap.set(c.id, c)                    // 远端新 → 采纳
+      else if (cts(e) > cts(c)) continue                             // 本机新 → 保持
       else childMap.set(c.id, { ...e, ...Object.fromEntries(Object.entries(c).filter(([, v]) => v != null && v !== '')) })
     }
 
