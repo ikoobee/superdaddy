@@ -44,6 +44,9 @@ SD.views = (() => {
       const t = SD.timers.get(k)
       if (span && t) span.textContent = SD.time.fmtClock(SD.timers.elapsed(t))
     }
+    /* 同步状态行 30s 刷新（C4） */
+    const st = document.getElementById('sync-st')
+    if (st) { const wrap = st.closest('.card'); if (wrap) wrap.outerHTML = syncStatusHTML().trim() || '' }
     const c = SD.store.child
     if (!c || !c.birth || !SD.state.feedRemind) return
     const fp = SD.feedPlan.feedPlan(c.birth, Date.now(), SD.store.recordsOf())
@@ -79,6 +82,20 @@ SD.views = (() => {
     }, 1000)
   }
 
+  /* 同步状态行（C4）：健康=最近一次成功拉取的时间；>5 分钟未同步提示检查 */
+  const syncAgo = iso => {
+    const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
+    if (s < 60) return `${s} 秒前`
+    if (s < 3600) return `${Math.floor(s / 60)} 分钟前`
+    return SD.time.fmtAgo(iso)
+  }
+  const syncStatusHTML = () => {
+    const cfg = SD.state.sync
+    if (!cfg || !cfg.room || !cfg.lastPull) return ''
+    const s = Math.floor((Date.now() - new Date(cfg.lastPull).getTime()) / 1000)
+    return `<div class="card" style="padding:8px 16px"><p class="note" id="sync-st" style="margin:0">${s > 300 ? '⚠️ 已 ' + syncAgo(cfg.lastPull) + ' 未同步（检查网络或手动同步）' : '☁️ 已同步 · ' + syncAgo(cfg.lastPull)}</p></div>`
+  }
+
   /* ══════════ 🏠 首页（每日多次） ══════════ */
   function home(el) {
     if (!child()) return onboard(el)
@@ -105,6 +122,8 @@ SD.views = (() => {
         const label = k === 'sleep' ? '😴 睡眠计时中' : `🍼 亲喂计时中（${({ L: '左', R: '右', B: '双侧' })[t.side] || ''}）`
         return `<a class="card linkcard" href="#${k === 'sleep' ? 'sleep-form' : 'feed-form'}"><h3>${label} · <span id="tm-${k}">${SD.time.fmtClock(SD.timers.elapsed(t))}</span></h3><p class="note">点击进入停止或取消——切页不影响计时</p></a>`
       }).join('')}
+      ${SD.state.family && !SD.state.family.selfId ? `<a class="card linkcard" href="#settings"><h3>👤 本机未设置身份</h3><p class="note">家庭模式下新记录将不署名（家人看不到是谁记的）——去设置本机身份</p></a>` : ''}
+      ${syncStatusHTML()}
       <div class="stat-grid">
         <div class="stat"><div class="k">今日喂养</div><div class="v">${s.feedCount} 次</div>${feedSub ? `<div class="sub">${feedSub}</div>` : ''}</div>
         <div class="stat"><div class="k">今日睡眠</div><div class="v">${(s.sleepMinutes / 60).toFixed(1)} 小时</div></div>
@@ -1710,7 +1729,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
             const own = st.family.members.filter(m => (st.family.localIds || []).includes(m.id))
             return own.length
               ? `<div class="row"><select id="fam-self" style="flex:1">${own.map(m => `<option value="${m.id}" ${m.id === st.family.selfId ? 'selected' : ''}>${esc(m.name)}（${esc(m.role || '成员')}）</option>`).join('')}</select><button class="btn ghost" id="fam-newid">＋ 新身份</button></div>`
-              : `<p class="note">本机身份已被家庭创建者移除——<button class="btn ghost" id="fam-newid">重新设置本机身份</button></p>`
+              : `<p class="note">${st.family.creator ? '本机暂无身份（你是家庭创建者）——' : '本机身份已被家庭创建者移除——'}<button class="btn ghost" id="fam-newid">${st.family.creator ? '设置本机身份' : '重新设置本机身份'}</button></p>`
           })()}
           <p class="note">共用一台设备换人记录时，切换本机身份或新增身份；成员随家人设备加入自动出现。</p>
           <p></p>
