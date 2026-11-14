@@ -1721,6 +1721,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
             <div class="row"><input type="text" readonly value="${st.sync.room}/${st.sync.pass}" style="flex:1" onfocus="this.select()"><button class="btn ghost" id="fam-copycode">复制</button></div>
             <p class="note">上次同步：${st.sync.lastPull ? SD.time.fmtAgo(st.sync.lastPull) : '从未'}${st.sync.lastPush ? ' · 推送 ' + SD.time.fmtAgo(st.sync.lastPush) : ''}</p>
             <p></p><button class="btn" id="fam-sync">🔄 立即同步</button>
+            <p></p><button class="btn ghost" id="fam-joinbtn2">改为加入家人分享的同步码</button>
           ` : `
             <p></p>
             <div class="row"><button class="btn ghost" id="fam-gencode" style="flex:1">创建新的家庭同步码</button><button class="btn ghost" id="fam-joinbtn" style="flex:1">🔗 加入（粘贴同步码）</button></div>
@@ -1895,7 +1896,11 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
       ov.querySelector('#jm-code').focus()
     }
     el.querySelector('#fam-joinbtn')?.addEventListener('click', openJoinModal)
-    /* F2 云同步开关（明确告知上传密文） */
+    /* 已有码但想加入别人的家庭（如误先创建）：换码覆盖并首同步 */
+    el.querySelector('#fam-joinbtn2')?.addEventListener('click', () => {
+      SD.ui.confirm('加入其他家庭？\n\n将用新的同步码替换当前家庭码（本机数据保留，合并进新家庭）。', () => openJoinModal())
+    })
+    /* F2 云同步开关（明确告知上传密文）；开启即自动创建家庭码并发起首同步 */
     el.querySelector('#fam-cloud')?.addEventListener('change', e => {
       if (!e.target.checked) {
         SD.ui.confirm('关闭云同步？\n\n本机数据完整保留，只是不再上传/拉取；家人设备的旧密文 90 天无活动后自动过期。', () => {
@@ -1903,7 +1908,13 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         })
         return
       }
-      openConsent(() => { SD.state.sync = {}; SD.store.save(); settings(el) }, () => { e.target.checked = false })
+      openConsent(() => {
+        const code = SD.sync.genCode()
+        SD.state.sync = { ...code, lastPull: null, lastPush: null }
+        SD.store.save(); settings(el)
+        SD.ui.toast('已自动创建家庭同步码，发给家人即可加入')
+        runFirstSync()
+      }, () => { e.target.checked = false })
     })
     /* 首次配码（创建/加入）后立即自动同步一次：用户预期「加入即有数据」 */
     const runFirstSync = () => {
