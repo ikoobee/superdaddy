@@ -39,7 +39,20 @@ SD.views = (() => {
   let feedTick = null, feedToastAt = null, feedVisArmed = false
   /* 补剂到时提醒：30s 心跳内检查，每天至多提示一次 */
   let suppToastDay = null
+  /* 睡眠计时白天超时提醒：每次计时只提醒一次（按 startAt 去重） */
+  let sleepOvertimeAt = 0
   function feedTickOnce() {
+    /* 睡眠计时白天超 4h 未停 → 提醒校对（夜间长睡不扰） */
+    {
+      const sl = SD.timers.get('sleep')
+      if (sl) {
+        const mins = SD.time.clockMinutes(SD.timers.elapsed(sl))
+        if (sleepOvertimeAt !== sl.startAt && SD.features.sleepOvertime(mins, new Date().getHours())) {
+          sleepOvertimeAt = sl.startAt
+          SD.ui.toast(`😴 睡眠计时已 ${Math.round(mins / 60)} 小时——宝宝醒了吗？回来校对保存`)
+        }
+      }
+    }
     /* 补剂：到时刻今日维D未补 → toast 一次/天 */
     const at = SD.state.suppRemindAt
     if (at) {
@@ -457,6 +470,12 @@ SD.views = (() => {
         if (mins < 1) { SD.ui.toast('不足 1 分钟，未记录（点「取消计时」放弃）'); return feedForm(el) }
         SD.store.addRecord({ type: 'feed', method: 'nurse', date: t.startDate, time: t.startStr, side: t.side, minutes: mins })
         location.hash = '#feed'
+        /* 喂完即睡链：一键接睡眠计时（夜奶主场景） */
+        SD.ui.confirm('宝宝睡着了？', () => {
+          SD.timers.start('sleep', { startStr: SD.time.nowTime(), startDate: SD.time.todayStr() })
+          SD.ui.toast('😴 睡眠计时已开始')
+          location.hash = '#sleep-form'
+        }, { okText: '开始睡眠计时' })
       }
     })
     el.querySelector('#f-save').addEventListener('click', () => {
@@ -524,6 +543,13 @@ SD.views = (() => {
           <p class="note" id="sl-note"></p>
         </div>
         <div id="sl-manual" hidden>
+          <div class="row">
+            <button class="btn ghost" data-ago="30" style="flex:1">½小时前</button>
+            <button class="btn ghost" data-ago="60" style="flex:1">1小时前</button>
+            <button class="btn ghost" data-ago="120" style="flex:1">2小时前</button>
+            <button class="btn ghost" data-ago="180" style="flex:1">3小时前</button>
+          </div>
+          <p class="note">点上面＝「约 X 前入睡、刚醒」自动填；今天是：<span id="sl-anchors"></span></p>
           <label class="field">日期（跨午夜睡眠选入睡那天）</label><input type="date" id="s-date">
           <label class="field">入睡时间</label><input type="time" id="s-start">
           <label class="field">醒来时间（跨午夜可小于入睡）</label><input type="time" id="s-end">
@@ -563,20 +589,65 @@ SD.views = (() => {
     }))
     el.querySelector('#s-start').value = SD.time.nowTime()
     el.querySelector('#s-end').value = SD.time.nowTime()
+    /* 停止计时 → 校对弹层：入睡可改（忘停/夜里醒过修正）、醒来默认现在、时长实时预览；取消=继续计时 */
+    const openSleepConfirm = t => {
+      document.getElementById('sleep-confirm-modal')?.remove()
+      const ov = document.createElement('div')
+      ov.className = 'overlay'; ov.id = 'sleep-confirm-modal'
+      ov.innerHTML = `<div class="modal"><h3>保存睡眠 · 请校对时间</h3>
+        <p class="note" style="display:block">忘了及时停止？把入睡时刻改对即可，时长按下面两个时刻自动算。</p>
+        <label class="field">入睡（${t.startDate}）</label><input type="time" id="sc-start" value="${t.startStr}">
+        <label class="field">醒来</label><input type="time" id="sc-end" value="${SD.time.nowTime()}">
+        <p class="note">时长 <b id="sc-dur">—</b></p>
+        <p></p><div class="row"><button class="btn ghost" id="sc-cancel">继续计时</button><button class="btn" id="sc-save">保存</button></div></div>`
+      document.body.appendChild(ov)
+      const startEl = ov.querySelector('#sc-start'), endEl = ov.querySelector('#sc-end'), durEl = ov.querySelector('#sc-dur')
+      const paint = () => {
+        const m = SD.summary.sleepMin(startEl.value, endEl.value)
+        durEl.textContent = m >= 60 ? `${(m / 60).toFixed(1)} 小时` : `${m} 分钟`
+      }
+      paint()
+      startEl.addEventListener('change', paint); endEl.addEventListener('change', paint)
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+      ov.querySelector('#sc-cancel').addEventListener('click', () => ov.remove())
+      ov.querySelector('#sc-save').addEventListener('click', () => {
+        const start = startEl.value, end = endEl.value
+        if (!start || !end) return SD.ui.toast('请填入睡与醒来')
+        if (start === end) return SD.ui.toast('入睡与醒来相同——跨午夜请把醒来填为较小时间')
+        const chk = SD.time.validateWhen(t.startDate, start)
+        if (!chk.ok) return SD.ui.toast(chk.msg)
+        const mins = SD.summary.sleepMin(start, end)
+        if (mins < 1) return SD.ui.toast('不足 1 分钟，未记录（点「继续计时」回去改）')
+        SD.timers.stop('sleep')
+        SD.store.addRecord({ type: 'sleep', date: t.startDate, start, end })
+        ov.remove()
+        SD.ui.toast(`本次睡眠 ${(mins / 60).toFixed(1)} 小时已记录`)
+        location.hash = '#feed'
+      })
+    }
     el.querySelector('#sl-go').addEventListener('click', () => {
       const t = SD.timers.get('sleep')
       if (!t) {
         paintRunning(SD.timers.start('sleep', { startStr: SD.time.nowTime(), startDate: SD.time.todayStr() }))
       } else {
-        SD.timers.stop('sleep')
-        const mins = SD.time.clockMinutes(SD.timers.elapsed(t))
-        if (mins < 1) { SD.ui.toast('不足 1 分钟，未记录（点「取消计时」放弃）'); return sleepForm(el) }
-        SD.store.addRecord({ type: 'sleep', date: t.startDate, start: t.startStr, end: SD.time.nowTime() })
-        SD.ui.toast(`本次睡眠 ${(mins / 60).toFixed(1)} 小时已记录`)
-        location.hash = '#feed'
+        openSleepConfirm(t)
       }
     })
     { const d = el.querySelector('#s-date'); d.max = SD.time.todayStr(); d.value = SD.time.todayStr() }
+    /* 相对时刻 chips：约 X 前入睡·刚醒；锚点=今天最近 3 条记录时刻（帮助回忆） */
+    el.querySelectorAll('#sl-manual [data-ago]').forEach(b => b.addEventListener('click', () => {
+      const ago = +b.dataset.ago
+      const s = new Date(Date.now() - ago * 60e3)
+      const pad = n => String(n).padStart(2, '0')
+      el.querySelector('#s-start').value = `${pad(s.getHours())}:${pad(s.getMinutes())}`
+      el.querySelector('#s-end').value = SD.time.nowTime()
+    }))
+    {
+      const today = SD.time.todayStr()
+      const anchors = SD.store.recordsOf().filter(r => r.date === today && (r.time || r.start)).slice(-3)
+        .map(r => `${iconOf(r)}${r.time || r.start}`).join('　')
+      el.querySelector('#sl-anchors').textContent = anchors || '还没有记录'
+    }
     el.querySelector('#s-save').addEventListener('click', () => {
       const start = el.querySelector('#s-start').value, end = el.querySelector('#s-end').value
       if (!start || !end) return SD.ui.toast('请填入睡与醒来时间')

@@ -37,6 +37,11 @@ SD.features = (() => {
       return 'ok'
     },
 
+    /** 睡眠计时超时提醒：白天（6-22 点）计时超 4 小时未停 → 提醒核对（夜间长睡正常不扰） */
+    sleepOvertime(minutes, hourOfDay, limit = 240) {
+      return hourOfDay >= 6 && hourOfDay < 22 && minutes > limit
+    },
+
     /** 补剂到时提醒：设了时刻 + 今日维生素D未补 + 当前已过时刻 */
     suppDue(takenToday, remindAt, now = new Date()) {
       if (!remindAt || takenToday) return false

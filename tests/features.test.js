@@ -48,6 +48,15 @@ describe('features: 补剂到时提醒', () => {
   })
 });
 
+describe('features: 睡眠计时超时提醒', () => {
+  it('白天超 4 小时提醒；夜间（22-6 点）长睡不扰；未超时不提醒', () => {
+    assert.equal(SD.features.sleepOvertime(250, 14), true)
+    assert.equal(SD.features.sleepOvertime(100, 14), false)
+    assert.equal(SD.features.sleepOvertime(250, 23), false)
+    assert.equal(SD.features.sleepOvertime(600, 3), false)
+  })
+});
+
 describe('features: 指南月龄定位', () => {
   it('7 个月命中 6 月段；0-1 月命中对应段', () => {
     assert.ok(SD.features.guideSection(7).title.includes('6'));
