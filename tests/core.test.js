@@ -114,6 +114,26 @@ describe('summary: 今日汇总', () => {
     assert.equal(s.formulaMl, 60);
   });
 
+  it('discardChild：丢弃本机宝宝档——删记录+写墓碑+清疫苗+activeId 修复', () => {
+    const state = {
+      children: [{ id: 'cR', name: '小宝', birth: '2026-08-15' }, { id: 'cX', name: '测试', birth: '2026-11-01' }],
+      activeId: 'cX',
+      records: [
+        { id: 'r1', childId: 'cX', type: 'feed' },
+        { id: 'r2', childId: 'cR', type: 'sleep' },
+      ],
+      vaccineDoneByChild: { cR: ['hbv1'], cX: ['bcg1'] },
+      deletedIds: [],
+    }
+    const { removed } = SD.summary.discardChild(state, 'cX')
+    assert.equal(removed, 1)
+    assert.deepEqual(state.children.map(c => c.id), ['cR'])
+    assert.deepEqual(state.records.map(r => r.id), ['r2'])            // 本机档记录删除
+    assert.ok(state.deletedIds.some(t => t.id === 'r1'))              // 墓碑防复活
+    assert.equal(state.vaccineDoneByChild.cX, undefined)
+    assert.equal(state.activeId, 'cR')
+  })
+
   it('跨午夜睡眠（start>end）计入当日', () => {
     const s = summarizeDay([
       { type: 'sleep', date: '2026-09-15', start: '23:00', end: '01:30' },

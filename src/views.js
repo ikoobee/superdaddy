@@ -1934,19 +1934,19 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         })
         .catch(err => { SD.ui.toast('自动同步失败：' + (err.message || '网络问题') + '——可点「立即同步」重试'); settings(el) })
     }
-    /* 宝宝档案合并引导：以家人档案为准，本机记录重映射并入（mergeChildren 纯函数，不丢数据） */
+    /* 宝宝档案处理引导（加入家庭且本机已有档）：三选一——同时保留 / 合并为一份 / 丢弃本机只留家人数据 */
     const offerChildMerge = (remoteChild, localChild) => {
       document.getElementById('child-merge-modal')?.remove()
       const ov = document.createElement('div')
       ov.className = 'overlay'; ov.id = 'child-merge-modal'
       const info = c => `${esc(c.name)}（${c.birth ? '生日 ' + esc(c.birth) : '预产期 ' + esc(c.due || '—')}）`
-      ov.innerHTML = `<div class="modal"><h3>宝宝档案合并</h3>
-        <p class="note" style="display:block">本机与家人各建了一份宝宝档案（通常是各自添加了同一宝宝）。以<b>家人的档案为准</b>合并？本机记录会并入，不会丢失。</p>
+      ov.innerHTML = `<div class="modal"><h3>本机已有宝宝档案</h3>
+        <p class="note" style="display:block">加入家庭后检测到本机与家人各有宝宝档案——可能是各自添加了同一宝宝，也可能是本机之前的数据。请选择处理方式：</p>
         <p>家人的：${info(remoteChild)}<br>本机的：${info(localChild)}</p>
-        <p></p><div class="row">
-          <button class="btn ghost" id="cm-keep">保留两份（如双胞胎）</button>
-          <button class="btn" id="cm-merge">合并为一份</button>
-        </div></div>`
+        <p></p><div class="row"><button class="btn ghost" id="cm-keep">同时保留</button></div>
+        <p></p><div class="row"><button class="btn ghost" id="cm-merge">合并为一份（同一宝宝，家人档案为准，本机记录并入）</button></div>
+        <p></p><div class="row"><button class="btn danger" id="cm-discard">丢弃本机档案（测试/旧数据，只留家人数据）</button></div>
+        <p class="note">不确定就选「同时保留」，之后可在宝宝档案里手动处理。</p></div>`
       document.body.appendChild(ov)
       const finish = () => { ov.remove(); settings(el); SD.app.render() }
       ov.addEventListener('click', e => { if (e.target === ov) finish() })
@@ -1955,7 +1955,15 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         const { remapped } = SD.summary.mergeChildren(SD.state, remoteChild.id, localChild.id)
         SD.store.save(); finish()
         SD.ui.toast(`已合并宝宝档案 · 并入本机 ${remapped} 条记录`)
-        SD.sync.syncNow().catch(() => SD.sync.schedulePush())   // 合并结果立即对齐家人
+        SD.sync.syncNow().catch(() => SD.sync.schedulePush())
+      })
+      ov.querySelector('#cm-discard').addEventListener('click', () => {
+        SD.ui.confirm(`丢弃本机档案「${localChild.name}」及其全部记录？\n此操作不可恢复（建议不确定时先选同时保留）。`, () => {
+          const { removed } = SD.summary.discardChild(SD.state, localChild.id)
+          SD.store.save(); finish()
+          SD.ui.toast(`已丢弃本机档案（${removed} 条记录）`)
+          SD.sync.syncNow().catch(() => SD.sync.schedulePush())
+        }, { danger: true, okText: '丢弃' })
       })
     }
     el.querySelector('#fam-gencode')?.addEventListener('click', () => {

@@ -47,6 +47,26 @@ SD.summary = {
     return { remapped }
   },
 
+  /**
+   * 丢弃本机宝宝档（加入家庭时选择「只留家人数据」）：删档 + 删其记录（写墓碑防合并复活）+ 清疫苗 + activeId 修复。
+   * 就地修改 state；返回删除的记录条数。
+   */
+  discardChild(state, childId) {
+    const now = new Date().toISOString()
+    const dropIds = new Set()
+    let removed = 0
+    state.records = (state.records || []).filter(r => {
+      if (r.childId === childId) { dropIds.add(r.id); removed++; return false }
+      return true
+    })
+    state.deletedIds = [...(state.deletedIds || []), ...[...dropIds].map(id => ({ id, at: now }))]
+    state.children = (state.children || []).filter(c => c.id !== childId)
+    const vac = (state.vaccineDoneByChild = state.vaccineDoneByChild || {})
+    delete vac[childId]
+    if (state.activeId === childId) state.activeId = state.children[0]?.id ?? null
+    return { removed }
+  },
+
   /** 单段睡眠分钟数：跨午夜（end < start）按入睡日 +24h；同时刻 = 0 */
   sleepMin(start, end) {
     const toMin = hm => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m }
