@@ -1711,6 +1711,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
             return `<div class="tl-item"><span class="desc"><b>${esc(m.name)}</b> · ${esc(m.role || '成员')}${m.id === st.family.selfId ? ' · 本机' : ''}${isOwn ? '' : ' · 家人设备'}</span>${isOwn ? `<button class="btn ghost" data-mrn="${m.id}">改名</button>` : ''}${st.family.creator ? `<button class="del" data-mrm="${m.id}">✕</button>` : ''}</div>`
           }).join('')}
           <p class="note">权限：改名仅限本机创建的身份；移除成员仅创建家庭的设备可操作（可移除任何成员）。</p>
+          ${st.family.creator === undefined ? `<p class="note">本家庭创建于旧版本——若这台设备是<b>创建家庭</b>的那台，请认领创建者权限：<button class="btn ghost" id="fam-claim">认领创建者</button></p>` : ''}
           <p class="note">不用云同步也可协作：导出备份发给对方 → 对方「从备份恢复」选<b>合并导入</b>（自动去重，删除 30 天内不复活）。</p>
           <p></p>
           <label class="field" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fam-cloud" ${st.sync ? 'checked' : ''}> ☁️ 云同步（端到端加密中转）</label>
@@ -1822,6 +1823,11 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
     el.querySelector('#fam-create')?.addEventListener('click', () => openIdentityModal())
     el.querySelector('#fam-newid')?.addEventListener('click', () => openIdentityModal())
     el.querySelectorAll('[data-mrn]').forEach(b => b.addEventListener('click', () => openRenameModal(b.dataset.mrn)))
+    el.querySelector('#fam-claim')?.addEventListener('click', () => {
+      SD.ui.confirm('确认这台设备创建了这个家庭？\n\n创建者可移除任何成员（含家人设备添加的）。', () => {
+        SD.state.family.creator = true; SD.store.save(); settings(el)
+      }, { okText: '我是创建者' })
+    })
     el.querySelector('#fam-self')?.addEventListener('change', e => {
       const f = SD.state.family
       f.selfId = e.target.value

@@ -99,6 +99,11 @@ describe('merge: 集合并集与设备私有字段', () => {
     assert.deepEqual(s.deletedIds, [])
   })
 
+  it('旧家庭（无 localIds）自举：当前 selfId 视为本机身份', () => {
+    const s = SD.storeMigrate({ version: 2, children: [], records: [], family: { members: [{ id: 'm1', name: '妈妈' }, { id: 'm2', name: '爸爸' }], selfId: 'm2' } })
+    assert.deepEqual(s.family.localIds, ['m2'])
+  })
+
   it('members 同 id：远端改名/改角色传播（非空字段覆盖）', () => {
     const local = { ...base(), family: { members: [{ id: 'm1', name: '妈妈', role: '妈妈' }, { id: 'm2', name: '爸爸', role: '爸爸' }], selfId: 'm1' } }
     const remote = { ...base(), family: { members: [{ id: 'm1', name: '妈咪', role: '其他' }, { id: 'm3', name: '奶奶', role: '奶奶' }], selfId: 'm3' } }
