@@ -1970,7 +1970,12 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         <p></p><div class="row"><button class="btn danger" id="cm-discard">丢弃本机档案（测试/旧数据，只留家人数据）</button></div>
         <p class="note">不确定就选「同时保留」，之后可在宝宝档案里手动处理。</p></div>`
       document.body.appendChild(ov)
-      const finish = () => { ov.remove(); settings(el); SD.app.render() }
+      const finish = () => {
+        ov.remove(); settings(el); SD.app.render()
+        /* 闭环：三种选择后若本机尚无身份（新设备首次加入），继续引导设置——身份落库时自动认领本机旧记录署名 */
+        if (!SD.summary.ownMember(SD.state.family, SD.state.deviceId))
+          openIdentityModal(null, { creator: false })
+      }
       ov.addEventListener('click', e => { if (e.target === ov) finish() })
       ov.querySelector('#cm-keep').addEventListener('click', finish)
       ov.querySelector('#cm-merge').addEventListener('click', () => {
