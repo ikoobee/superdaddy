@@ -350,6 +350,7 @@ SD.views = (() => {
             <label class="field">哪侧</label>
             <select id="f-side"><option value="L">左</option><option value="R">右</option><option value="B">双侧</option></select>
             <label class="field">时长（分钟）</label><input type="number" id="f-min" value="15" min="0" max="120">
+            <label class="field">日期（可补录往日）</label><input type="date" id="f-date">
             <label class="field">时间</label><input type="time" id="f-time">
             <p></p><button class="btn" id="f-save">保存</button>
           </div>
@@ -357,6 +358,7 @@ SD.views = (() => {
         <div id="f-formula" hidden>
           <label class="field">奶量（ml）</label><input type="number" id="f-fml" value="${ref ? ref.perMl : 120}" min="1" max="500">
           ${ref ? `<p class="note">月龄参考：每次约 ${ref.perMl}ml · 间隔约 ${ref.interval}h（可按需调整）</p>` : ''}
+          <label class="field">日期（可补录往日）</label><input type="date" id="f-fdate">
           <label class="field">时间</label><input type="time" id="f-ftime">
           <p></p><button class="btn" id="f-fsave">保存奶粉记录</button>
         </div>
@@ -366,6 +368,7 @@ SD.views = (() => {
     let side = 'L'
     el.querySelector('#f-time').value = SD.time.nowTime()
     el.querySelector('#f-ftime').value = SD.time.nowTime()
+    for (const id of ['#f-date', '#f-fdate']) { const d = el.querySelector(id); d.max = SD.time.todayStr(); d.value = SD.time.todayStr() }
     const isRunning = () => !!SD.timers.get('feed')
 
     const paintRunning = t => {
@@ -427,7 +430,8 @@ SD.views = (() => {
     })
     el.querySelector('#f-save').addEventListener('click', () => {
       SD.store.addRecord({
-        type: 'feed', method: 'nurse', date: SD.time.todayStr(),
+        type: 'feed', method: 'nurse',
+        date: el.querySelector('#f-date').value || SD.time.todayStr(),
         time: el.querySelector('#f-time').value || SD.time.nowTime(),
         side: el.querySelector('#f-side').value,
         minutes: +el.querySelector('#f-min').value || 0,
@@ -437,7 +441,7 @@ SD.views = (() => {
     el.querySelector('#f-fsave').addEventListener('click', () => {
       const ml = +el.querySelector('#f-fml').value
       if (!ml || ml < 1 || ml > 500) return SD.ui.toast('请输入 1-500 之间的奶量')
-      SD.store.addRecord({ type: 'feed', method: 'formula', date: SD.time.todayStr(), time: el.querySelector('#f-ftime').value || SD.time.nowTime(), ml })
+      SD.store.addRecord({ type: 'feed', method: 'formula', date: el.querySelector('#f-fdate').value || SD.time.todayStr(), time: el.querySelector('#f-ftime').value || SD.time.nowTime(), ml })
       SD.ui.toast(`已记录奶粉 ${ml}ml`)
       location.hash = '#feed'
     })
@@ -451,12 +455,14 @@ SD.views = (() => {
       <div class="card">
         <label class="field">时段</label><select id="tf-part"><option>晨起</option><option>午后</option><option>晚间</option></select>
         <label class="field">体温 (℃)</label><input type="number" id="tf-val" step="0.1" min="34" max="43">
+        <label class="field">日期（可补录往日）</label><input type="date" id="tf-date">
         <p></p><button class="btn" id="tf-save">保存</button>
       </div>`
+    { const d = el.querySelector('#tf-date'); d.max = SD.time.todayStr(); d.value = SD.time.todayStr() }
     el.querySelector('#tf-save').addEventListener('click', () => {
       const v = +el.querySelector('#tf-val').value
       if (!v || v < 34 || v > 43) return SD.ui.toast('请输入 34-43 之间的体温值')
-      SD.store.addRecord({ type: 'temp', date: SD.time.todayStr(), time: SD.time.nowTime(), part: el.querySelector('#tf-part').value, val: v })
+      SD.store.addRecord({ type: 'temp', date: el.querySelector('#tf-date').value || SD.time.todayStr(), time: SD.time.nowTime(), part: el.querySelector('#tf-part').value, val: v })
       const st = SD.features.tempStatus(mo, v)
       if (st === 'urgent') SD.ui.toast('⚠️ 3 月龄内 ≥38℃：请立即就医', 'danger')
       else if (st === 'high') SD.ui.toast('高热 ≥38.5℃，必要时就医', 'warn')
@@ -478,6 +484,7 @@ SD.views = (() => {
           <p class="note" id="sl-note"></p>
         </div>
         <div id="sl-manual" hidden>
+          <label class="field">日期（跨午夜睡眠选入睡那天）</label><input type="date" id="s-date">
           <label class="field">入睡时间</label><input type="time" id="s-start">
           <label class="field">醒来时间（跨午夜可小于入睡）</label><input type="time" id="s-end">
           <p></p><button class="btn" id="s-save">保存</button>
@@ -529,11 +536,12 @@ SD.views = (() => {
         location.hash = '#feed'
       }
     })
+    { const d = el.querySelector('#s-date'); d.max = SD.time.todayStr(); d.value = SD.time.todayStr() }
     el.querySelector('#s-save').addEventListener('click', () => {
       const start = el.querySelector('#s-start').value, end = el.querySelector('#s-end').value
       if (!start || !end) return SD.ui.toast('请填入睡与醒来时间')
       if (start === end) return SD.ui.toast('入睡与醒来相同——跨午夜请把醒来填为较小时间（如 23:00 → 01:30）')
-      SD.store.addRecord({ type: 'sleep', date: SD.time.todayStr(), start, end })
+      SD.store.addRecord({ type: 'sleep', date: el.querySelector('#s-date').value || SD.time.todayStr(), start, end })
       location.hash = '#feed'
     })
   }
@@ -2064,8 +2072,10 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         SD.ui.toast(st.recordsAdded || st.recordsUpdated ? `同步完成：并入 ${st.recordsAdded} 条 · 更新 ${st.recordsUpdated} 条` : '同步完成：已与家人数据一致')
         settings(el); SD.app.render()
       } catch (err) {
-        SD.ui.toast('同步失败：' + (err.message || '网络问题或密钥不符'))
         b.disabled = false; b.textContent = old
+        if (err && err.code === 'SYNC_CODE')
+          return SD.ui.confirm('家庭同步码已失效（创建者可能更换了码）。\n现在用新码重新加入家庭？', () => openJoinModal(), { okText: '重新加入' })
+        SD.ui.toast('同步失败：' + (err.message || '网络问题'))
       }
     })
     el.querySelector('#s-feednotify').addEventListener('change', e => {

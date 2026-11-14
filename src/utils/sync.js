@@ -50,7 +50,12 @@ SD.sync = (() => {
     if (res.status === 404) return null
     if (!res.ok) throw new Error(`中转服务 ${res.status}`)
     const { at, blob } = await res.json()
-    return { at, state: await decryptJSON(blob, room, pass) }
+    try {
+      return { at, state: await decryptJSON(blob, room, pass) }
+    } catch {
+      /* 解密失败=房间码/密钥与中转密文不匹配（家庭换了码）——与网络错误完全不同的处理路径 */
+      throw Object.assign(new Error('同步码已失效（家庭可能更换了同步码）'), { code: 'SYNC_CODE' })
+    }
   }
 
   async function pushState(state, room, pass) {
@@ -89,7 +94,8 @@ SD.sync = (() => {
       || (state.family?.members || []).some(m => after(m.createdAt || m.renamedAt))   // 新成员/改名未推送
   }
 
-  /** 拉取合并 + 检出未推送变更自动补推（启动/周期/回前台调用；失败不打扰） */
+  /** 拉取合并 + 检出未推送变更自动补推（启动/周期/回前台调用；失败静默，但房码失效累计 3 次提醒一次） */
+  let codeFail = 0
   async function autoPull() {
     try {
       const cfg = SD.state.sync
@@ -109,7 +115,11 @@ SD.sync = (() => {
         changed = true
       }
       if (changed) { SD.store.save(); SD.app.render() }
-    } catch { /* 静默 */ }
+      codeFail = 0
+    } catch (e) {
+      if (e && e.code === 'SYNC_CODE' && ++codeFail === 3)
+        SD.ui.toast('同步码可能已失效——请到 设置 → 家庭协作 用新码重新加入')
+    }
   }
 
   /* 记录变化 → 2 秒防抖自动同步（准实时；拉取合并→推送，避免空房间推送覆盖家人未拉取的数据）；失败静默 */
