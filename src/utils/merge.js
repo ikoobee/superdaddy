@@ -46,16 +46,24 @@ SD.merge = (() => {
     const taskMap = new Map()
     for (const t of [...(remote.tasks || []), ...(local.tasks || [])]) taskMap.set(t.id, t)
 
-    /* family：selfId 本机私有；members 并集 + 同 id 改名/改角色传播（非空字段覆盖） */
+    /* family：selfId/creator/localIds 设备私有；members 并集 + 同 id 改名传播 + 移除墓碑传播；
+       本机身份被移除时回落到本机仍存的身份，绝不冒认他人身份（无则置空待重设） */
     let family = local.family || null
     if (family && remote.family) {
-      const mMap = new Map(family.members.map(m => [m.id, m]))
-      for (const m of remote.family.members || []) {
+      const gone = new Set([...(family.removedMembers || []), ...(remote.family.removedMembers || [])])
+      const mMap = new Map()
+      for (const m of [...family.members, ...(remote.family.members || [])]) {
+        if (gone.has(m.id)) continue
         const e = mMap.get(m.id)
         if (!e) mMap.set(m.id, m)
         else mMap.set(m.id, { ...e, ...Object.fromEntries(Object.entries(m).filter(([, v]) => v != null && v !== '')) })
       }
-      family = { ...family, members: [...mMap.values()] }
+      const members = [...mMap.values()]
+      const localIds = (family.localIds || []).filter(id => members.some(m => m.id === id))
+      const selfId = members.some(m => m.id === family.selfId)
+        ? family.selfId
+        : (members.find(m => localIds.includes(m.id))?.id ?? null)
+      family = { ...family, members, localIds, selfId, removedMembers: [...gone] }
     }
 
     /* activeId 设备私有，但必须指向合并后仍存在的孩子：无效/为空时回落到合并结果第一个

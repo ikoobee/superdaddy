@@ -125,6 +125,20 @@ describe('summary: 今日汇总', () => {
     assert.equal(SD.summary.sleepMin('23:00', '01:30'), 150); // 跨午夜按入睡日 +24h
     assert.equal(SD.summary.sleepMin('09:00', '09:00'), 0);
   });
+  it('claimUnsigned：认领无署名记录（by+byName），已有署名不动，返回条数', () => {
+    const member = { id: 'm1', name: '妈妈' }
+    const recs = [
+      { type: 'pee', date: '2026-11-14' },                                  // 未署名 → 认领
+      { type: 'feed', date: '2026-11-14', by: 'm2', byName: '奶奶' },        // 他人署名 → 不动
+      { type: 'sleep', date: '2026-11-14' },                                // 未署名 → 认领
+    ]
+    const n = SD.summary.claimUnsigned(recs, member)
+    assert.equal(n, 2)
+    assert.deepEqual(recs[0], { type: 'pee', date: '2026-11-14', by: 'm1', byName: '妈妈' })
+    assert.equal(recs[1].by, 'm2')
+    assert.equal(recs[2].by, 'm1')
+  })
+
   describe('记录人显示（authorName）', () => {
     const fam = { members: [{ id: 'm1', name: '妈妈' }, { id: 'm2', name: '爸爸' }], selfId: 'm1' }
     it('未署名或未开家庭 → null（不显示徽标）', () => {

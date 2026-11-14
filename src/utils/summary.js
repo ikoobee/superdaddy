@@ -16,6 +16,18 @@ SD.summary = {
     return m ? m.name : (r.byName || '家人')
   },
 
+  /**
+   * 认领未署名记录（开启家庭/加入家庭/切换身份时）：by 为空的本机历史记录归入指定成员。
+   * 就地修改（records 是状态对象）；他人已署名的不动；返回认领条数。
+   */
+  claimUnsigned(records, member) {
+    let n = 0
+    for (const r of records || []) {
+      if (!r.by) { r.by = member.id; r.byName = member.name; n++ }
+    }
+    return n
+  },
+
   /** 单段睡眠分钟数：跨午夜（end < start）按入睡日 +24h；同时刻 = 0 */
   sleepMin(start, end) {
     const toMin = hm => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m }

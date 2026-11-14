@@ -110,6 +110,23 @@ describe('merge: 集合并集与设备私有字段', () => {
     assert.equal(state.family.selfId, 'm1')                         // 本机身份不动
   })
 
+  it('成员移除墓碑传播：创建者删的成员在加入设备上消失，removedMembers 并集', () => {
+    const local = { ...base(), family: { members: [{ id: 'm1', name: '妈妈' }, { id: 'm2', name: '奶奶' }], selfId: 'm1', creator: true, localIds: ['m1'] } }
+    const remote = { ...base(), family: { members: [{ id: 'm1', name: '妈妈' }, { id: 'm2', name: '奶奶' }], selfId: 'm2', creator: false, localIds: ['m2'], removedMembers: ['m2'] } }
+    const { state } = SD.merge.mergeState(local, remote)
+    assert.deepEqual(state.family.members.map(m => m.id), ['m1'])       // m2 被移除传播
+    assert.ok(state.family.removedMembers.includes('m2'))
+  })
+
+  it('本机身份被移除后：selfId 回落到本机仍存的身份；localIds 清理', () => {
+    const local = { ...base(), family: { members: [{ id: 'm1', name: '妈妈' }, { id: 'm2', name: '奶奶' }], selfId: 'm2', creator: false, localIds: ['m2'] } }
+    const remote = { ...base(), family: { members: [{ id: 'm1', name: '妈妈' }], selfId: 'm1', creator: true, localIds: ['m1'], removedMembers: ['m2'] } }
+    const { state } = SD.merge.mergeState(local, remote)
+    assert.deepEqual(state.family.members.map(m => m.id), ['m1'])
+    assert.equal(state.family.selfId, null)   // 本机唯一身份被移除：置空（引导重新设身份），不冒认他人身份
+    assert.deepEqual(state.family.localIds, [])
+  })
+
   it('合并后修复 activeId：本机从未有宝宝（null）→ 取合并结果第一个孩子（B 端加入同步场景）', () => {
     const local = { ...base(), children: [], activeId: null }        // 无痕新站：从未建宝宝
     const remote = { ...base() }                                      // A 端：c1 + activeId c1
