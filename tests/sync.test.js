@@ -41,6 +41,24 @@ describe('sync: 加密 round-trip', () => {
   })
 })
 
+describe('sync: 未推送检测（重开补推）', () => {
+  it('有比上次推送更新的记录 → 需要补推', () => {
+    const state = { records: [{ updatedAt: '2026-11-14T10:00:00Z' }], deletedIds: [] }
+    assert.equal(SD.sync.hasUnpushed(state, new Date('2026-11-14T09:00:00Z').getTime()), true)
+    assert.equal(SD.sync.hasUnpushed(state, new Date('2026-11-14T11:00:00Z').getTime()), false)
+  })
+
+  it('墓碑（删除）晚于上次推送也触发补推', () => {
+    const state = { records: [], deletedIds: [{ id: 'r1', at: '2026-11-14T10:00:00Z' }] }
+    assert.equal(SD.sync.hasUnpushed(state, new Date('2026-11-14T09:00:00Z').getTime()), true)
+  })
+
+  it('从未推送过（lastPush=0）且有任意带时间戳数据 → 需要补推', () => {
+    assert.equal(SD.sync.hasUnpushed({ records: [{ updatedAt: '2026-11-14T10:00:00Z' }], deletedIds: [] }, 0), true)
+    assert.equal(SD.sync.hasUnpushed({ records: [], deletedIds: [] }, 0), false)
+  })
+})
+
 describe('sync: 家庭码生成', () => {
   it('格式：房间码/密钥各 16 位无易混字符；两次生成不同', () => {
     const a = SD.sync.genCode(), b = SD.sync.genCode()

@@ -80,30 +80,45 @@ SD.sync = (() => {
     return stats || { recordsAdded: 0, recordsUpdated: 0 }
   }
 
-  /** 启动静默拉取（失败不打扰） */
+  /** 有比上次推送更新的记录/墓碑 → 需要补推（设备重开时把滞留本机的变更推上去） */
+  function hasUnpushed(state, lastPushMs) {
+    const t = x => x.updatedAt || x.at
+    return (state.records || []).some(r => t(r) && new Date(t(r)).getTime() > lastPushMs)
+      || (state.deletedIds || []).some(d => d.at && new Date(d.at).getTime() > lastPushMs)
+  }
+
+  /** 拉取合并 + 检出未推送变更自动补推（启动/周期/回前台调用；失败不打扰） */
   async function autoPull() {
     try {
       const cfg = SD.state.sync
       if (!cfg || !cfg.room) return
       const remote = await pullRemote(cfg.room, cfg.pass)
-      if (!remote) return
-      const merged = SD.merge.mergeState(SD.state, remote.state)
-      SD.state = merged.state
-      SD.state.sync.lastPull = new Date().toISOString()
-      SD.store.save()
-      if ((merged.stats.recordsAdded || 0) + (merged.stats.recordsUpdated || 0) > 0) SD.app.render()
+      let changed = false
+      if (remote) {
+        const merged = SD.merge.mergeState(SD.state, remote.state)
+        SD.state = merged.state
+        SD.state.sync.lastPull = new Date().toISOString()
+        changed = (merged.stats.recordsAdded || 0) + (merged.stats.recordsUpdated || 0) > 0
+      }
+      /* 补推：上次关闭前来不及推的记录/删除（拉取后推合并结果，不会覆盖家人数据） */
+      const lastPushMs = SD.state.sync.lastPush ? new Date(SD.state.sync.lastPush).getTime() : 0
+      if (hasUnpushed(SD.state, lastPushMs)) {
+        SD.state.sync.lastPush = await pushState(SD.state, SD.state.sync.room, SD.state.sync.pass)
+        changed = true
+      }
+      if (changed) { SD.store.save(); SD.app.render() }
     } catch { /* 静默 */ }
   }
 
-  /* 记录变化 → 8 秒防抖自动同步（拉取合并→推送，避免空房间推送覆盖家人未拉取的数据）；失败静默等下次 */
+  /* 记录变化 → 2 秒防抖自动同步（准实时；拉取合并→推送，避免空房间推送覆盖家人未拉取的数据）；失败静默 */
   let pushTimer = null
   function schedulePush() {
     if (!SD.state?.sync?.room) return
     clearTimeout(pushTimer)
     pushTimer = setTimeout(async () => {
-      try { await syncNow() } catch { /* 静默：下次记录变化/手动同步再试 */ }
-    }, 8000)
+      try { await syncNow() } catch { /* 静默：下次记录变化/手动同步/重开补推再试 */ }
+    }, 2000)
   }
 
-  return { encryptJSON, decryptJSON, genCode, parseCode, syncNow, autoPull, schedulePush, RELAY }
+  return { encryptJSON, decryptJSON, genCode, parseCode, syncNow, autoPull, schedulePush, hasUnpushed, RELAY }
 })()
