@@ -115,6 +115,20 @@ describe('merge: 集合并集与设备私有字段', () => {
     assert.equal(state.family.selfId, 'm1')                         // 本机身份不动
   })
 
+  it('成员 LWW：本机改名时间戳更新 → 远端旧名不回滚（刷新竞态）', () => {
+    const local = { ...base(), family: { members: [{ id: 'm1', name: '新名', role: '妈妈', renamedAt: '2026-11-14T12:00:00Z' }], selfId: 'm1' } }
+    const remote = { ...base(), family: { members: [{ id: 'm1', name: '旧名', role: '妈妈', renamedAt: '2026-11-14T11:00:00Z' }], selfId: 'm1' } }
+    const { state } = SD.merge.mergeState(local, remote)
+    assert.equal(state.family.members.find(m => m.id === 'm1').name, '新名')
+  })
+
+  it('成员 LWW：远端改名时间戳更新 → 远端新名传播到本机', () => {
+    const local = { ...base(), family: { members: [{ id: 'm1', name: '旧名', renamedAt: '2026-11-14T11:00:00Z' }], selfId: 'm1' } }
+    const remote = { ...base(), family: { members: [{ id: 'm1', name: '新名', renamedAt: '2026-11-14T12:00:00Z' }], selfId: 'm1' } }
+    const { state } = SD.merge.mergeState(local, remote)
+    assert.equal(state.family.members.find(m => m.id === 'm1').name, '新名')
+  })
+
   it('成员移除墓碑传播：创建者删的成员在加入设备上消失，removedMembers 并集', () => {
     const local = { ...base(), family: { members: [{ id: 'm1', name: '妈妈' }, { id: 'm2', name: '奶奶' }], selfId: 'm1', creator: true, localIds: ['m1'] } }
     const remote = { ...base(), family: { members: [{ id: 'm1', name: '妈妈' }, { id: 'm2', name: '奶奶' }], selfId: 'm2', creator: false, localIds: ['m2'], removedMembers: ['m2'] } }

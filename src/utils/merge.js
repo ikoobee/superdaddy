@@ -52,10 +52,14 @@ SD.merge = (() => {
     if (family && remote.family) {
       const gone = new Set([...(family.removedMembers || []), ...(remote.family.removedMembers || [])])
       const mMap = new Map()
+      const ts = m => (m.renamedAt ? new Date(m.renamedAt).getTime() : 0)
       for (const m of [...family.members, ...(remote.family.members || [])]) {
         if (gone.has(m.id)) continue
         const e = mMap.get(m.id)
-        if (!e) mMap.set(m.id, m)
+        if (!e) { mMap.set(m.id, m); continue }
+        /* 改名 LWW：renamedAt 新者整胜——本机刚改名但还没推送时，远端旧名不会回滚（刷新竞态）；无时间戳退回「远端非空覆盖」 */
+        if (ts(m) > ts(e)) mMap.set(m.id, m)
+        else if (ts(e) > ts(m)) continue
         else mMap.set(m.id, { ...e, ...Object.fromEntries(Object.entries(m).filter(([, v]) => v != null && v !== '')) })
       }
       const members = [...mMap.values()]

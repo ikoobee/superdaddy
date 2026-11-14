@@ -1811,8 +1811,9 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         const name = ov.querySelector('#rn-name').value.trim()
         if (!name) return SD.ui.toast('称呼不能为空')
         m.name = name; m.role = ov.querySelector('#rn-role').value
+        m.renamedAt = new Date().toISOString()   // LWW：改名时间戳，防刷新竞态回滚
         SD.store.save(); ov.remove(); settings(el)
-        SD.sync?.schedulePush?.()   // 改名传播
+        SD.sync?.syncNow?.().catch(() => SD.sync?.schedulePush?.())   // 立即推送（不等防抖）；失败退回防抖重试
       })
     }
     /* 退出家庭模式（回到单人；云同步一并关闭） */
