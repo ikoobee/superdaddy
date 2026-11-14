@@ -38,6 +38,16 @@ describe('growth: WHO 百分位', () => {
   });
 });
 
+describe('features: 补剂到时提醒', () => {
+  it('suppDue：到时刻未补 true；已补/未到/未设 false', () => {
+    const now = new Date('2026-11-15T10:30:00')
+    assert.equal(SD.features.suppDue(false, '10:00', now), true)
+    assert.equal(SD.features.suppDue(true, '10:00', now), false)
+    assert.equal(SD.features.suppDue(false, '11:00', now), false)
+    assert.equal(SD.features.suppDue(false, null, now), false)
+  })
+});
+
 describe('features: 指南月龄定位', () => {
   it('7 个月命中 6 月段；0-1 月命中对应段', () => {
     assert.ok(SD.features.guideSection(7).title.includes('6'));

@@ -37,7 +37,19 @@ SD.views = (() => {
   }
   /* 全局 30s 心跳：卡内倒计时刷新 + 到时提示/通知（仅应用打开期间——本地优先无推送服务） */
   let feedTick = null, feedToastAt = null, feedVisArmed = false
+  /* 补剂到时提醒：30s 心跳内检查，每天至多提示一次 */
+  let suppToastDay = null
   function feedTickOnce() {
+    /* 补剂：到时刻今日维D未补 → toast 一次/天 */
+    const at = SD.state.suppRemindAt
+    if (at) {
+      const today = SD.time.todayStr()
+      const taken = SD.store.recordsOf().some(r => r.type === 'vitd' && r.date === today)
+      if (!taken && SD.features.suppDue(false, at) && suppToastDay !== today) {
+        suppToastDay = today
+        SD.ui.toast('☀️ 今日维生素D还没补，别忘了')
+      }
+    }
     /* 首页计时指示卡顺带刷新（30s 粒度；表单内表盘由 armFormClock 秒级刷） */
     for (const k of ['sleep', 'feed']) {
       const span = document.getElementById('tm-' + k)
@@ -1864,6 +1876,9 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         <label class="field" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="s-feedremind" ${st.feedRemind ? 'checked' : ''}> 待喂养提醒（首页倒计时卡 + 到时应用内提示）</label>
         <p></p>
         <label class="field" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="s-feednotify" ${st.feedNotify ? 'checked' : ''}> 到时浏览器通知<span class="note">（仅应用打开期间有效——本地优先，无推送服务）</span></label>
+        <p></p>
+        <label class="field" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="s-suppremind" ${st.suppRemindAt ? 'checked' : ''}> 补剂提醒（到时刻今日维D未补则提示）</label>
+        ${st.suppRemindAt ? `<input type="time" id="s-supptime" value="${st.suppRemindAt}">` : ''}
         <p class="note">推荐量与间隔按月龄参考表自动更新：亲喂按需，奶粉参考间隔；提醒为育儿辅助参考，以宝宝实际饥饱信号为准。</p>
       </div>
       <div class="sec-title">数据主权（核心承诺）</div>
@@ -1881,6 +1896,11 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
     el.querySelector('#s-open-add').addEventListener('click', () =>
       openAddModal(() => { location.hash = '#settings'; SD.app.render() }))
     el.querySelector('#s-feedremind').addEventListener('change', e => { SD.state.feedRemind = e.target.checked; SD.store.save() })
+    el.querySelector('#s-suppremind').addEventListener('change', e => {
+      SD.state.suppRemindAt = e.target.checked ? '10:00' : null
+      SD.store.save(); settings(el)
+    })
+    el.querySelector('#s-supptime')?.addEventListener('change', e => { SD.state.suppRemindAt = e.target.value || null; SD.store.save() })
     /* 家庭协作：创建/加入家庭 / 成员管理 / 本机身份 */
     const ROLES = ['妈妈', '爸爸', '爷爷', '奶奶', '外公', '外婆', '其他']
     const roleOptions = cur => ROLES.map(r => `<option ${r === cur ? 'selected' : ''}>${r}</option>`).join('')

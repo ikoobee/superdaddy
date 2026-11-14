@@ -37,6 +37,13 @@ SD.features = (() => {
       return 'ok'
     },
 
+    /** 补剂到时提醒：设了时刻 + 今日维生素D未补 + 当前已过时刻 */
+    suppDue(takenToday, remindAt, now = new Date()) {
+      if (!remindAt || takenToday) return false
+      const [h, m] = String(remindAt).split(':').map(Number)
+      return now.getHours() * 60 + now.getMinutes() >= h * 60 + m
+    },
+
     /** 奶量参考：feed.milk[month] = [每日次数, 每次ml, 小时间隔, 说明] */
     milkRef(month) {
       const m = SD.DATA.feed.milk
@@ -72,10 +79,10 @@ SD.features = (() => {
 
 /** v1 → v2 状态迁移（纯函数，store 调用）：单孩 → children[] + 按 childId 归档 */
 SD.storeMigrate = state => {
-  const base = { version: 2, children: [], activeId: null, records: [], vaccineDoneByChild: {}, epdsHistory: [], tasks: [], feedRemind: true, feedNotify: false, family: null, deletedIds: [], removedChildren: [], sync: null }
+  const base = { version: 2, children: [], activeId: null, records: [], vaccineDoneByChild: {}, epdsHistory: [], tasks: [], feedRemind: true, feedNotify: false, suppRemindAt: null, family: null, deletedIds: [], removedChildren: [], sync: null }
   if (!state) return base
   if (state.version === 2) {
-    const s = { tasks: [], feedRemind: true, feedNotify: false, family: null, deletedIds: [], removedChildren: [], sync: null, ...state }   // 补默认字段（老 v2 备份）
+    const s = { tasks: [], feedRemind: true, feedNotify: false, suppRemindAt: null, family: null, deletedIds: [], removedChildren: [], sync: null, ...state }   // 补默认字段（老 v2 备份）
     /* v0.9.0 前的旧家庭自举：当前 selfId 是本机设置的身份 → 视为本机身份 */
     if (s.family && s.family.selfId && !(s.family.localIds || []).length) s.family.localIds = [s.family.selfId]
     return s
