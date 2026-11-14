@@ -23,13 +23,29 @@ SD.summary = {
   },
 
   /**
-   * 认领未署名记录（开启家庭/加入家庭/切换身份时）：by 为空的本机历史记录归入指定成员。
+   * 认领未署名记录（开启家庭/加入家庭/切换身份时）：by 为空的历史记录归入指定成员。
+   * onlyIds（可选）：只认领集合内的 id——加入端用它限定「首同步前本机已有」的记录，防止误领家人同步来的。
    * 就地修改（records 是状态对象）；他人已署名的不动；返回认领条数。
    */
-  claimUnsigned(records, member) {
+  claimUnsigned(records, member, onlyIds = null) {
     let n = 0
     for (const r of records || []) {
-      if (!r.by) { r.by = member.id; r.byName = member.name; n++ }
+      if (r.by) continue
+      if (onlyIds && !onlyIds.has(r.id)) continue
+      r.by = member.id; r.byName = member.name; n++
+    }
+    return n
+  },
+
+  /**
+   * 历史署名归集（创建者维护动作）：把「未署名」与「显示为家人」（孤儿且无快照）的记录归入指定成员；
+   * 有效署名与称呼快照（如已删成员「奶奶」）保留。返回归集条数。
+   */
+  claimOrphans(records, family, member) {
+    let n = 0
+    for (const r of records || []) {
+      const an = SD.summary.authorName(r, family)
+      if (an === null || an === '家人') { r.by = member.id; r.byName = member.name; n++ }
     }
     return n
   },

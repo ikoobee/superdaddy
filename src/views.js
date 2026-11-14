@@ -1711,6 +1711,12 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
             return `<div class="tl-item"><span class="desc"><b>${esc(m.name)}</b> · ${esc(m.role || '成员')}${m.id === st.family.selfId ? ' · 本机' : ''}${isOwn ? '' : ' · 家人设备'}</span>${isOwn ? `<button class="btn ghost" data-mrn="${m.id}">改名</button>` : ''}${st.family.creator ? `<button class="del" data-mrm="${m.id}">✕</button>` : ''}</div>`
           }).join('')}
           <p class="note">权限：改名仅限本机创建的身份；移除成员仅创建家庭的设备可操作（可移除任何成员）。</p>
+          ${st.family.creator ? (() => {
+            const me = st.family.members.find(m => m.id === st.family.selfId)
+            if (!me) return ''
+            const orphans = SD.state.records.filter(r => { const an = SD.summary.authorName(r, st.family); return an === null || an === '家人' }).length
+            return orphans ? `<p></p><button class="btn ghost" id="fam-claimorph">把 ${orphans} 条未署名/失效署名的历史记录归入我（${esc(me.name)}）</button>` : ''
+          })() : ''}
           ${st.family.creator === undefined ? `<p class="note">本家庭创建于旧版本——若这台设备是<b>创建家庭</b>的那台，请认领创建者权限：<button class="btn ghost" id="fam-claim">认领创建者</button></p>` : ''}
           <p class="note">不用云同步也可协作：导出备份发给对方 → 对方「从备份恢复」选<b>合并导入</b>（自动去重，删除 30 天内不复活）。</p>
           <p></p>
@@ -1764,6 +1770,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
     /* 本机身份：未开家庭=开启并设身份（creator 标记创建/加入）；已开家庭=新增身份并切换（共用设备换人记录）
        身份落库后自动认领本机未署名历史记录 */
     const openIdentityModal = (onDone = null, opts = { creator: true }) => {
+      /* opts.claimOnly：加入端限定只认领「加入前本机已有」的记录（防误领家人同步来的历史） */
       const creating = !SD.state.family
       document.getElementById('identity-modal')?.remove()
       const ov = document.createElement('div')
@@ -1784,7 +1791,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         const member = { id, name, role: ov.querySelector('#id-role').value, deviceId: SD.state.deviceId }   // deviceId：重新加入时复用身份
         if (creating) SD.state.family = { members: [member], selfId: id, creator: opts.creator, localIds: [id] }
         else { SD.state.family.members.push(member); SD.state.family.localIds.push(id); SD.state.family.selfId = id }
-        const claimed = SD.summary.claimUnsigned(SD.state.records, member)
+        const claimed = SD.summary.claimUnsigned(SD.state.records, member, opts.claimOnly || null)
         SD.store.save(); ov.remove()
         SD.ui.toast(creating ? `家庭已创建 · 本机身份「${name}」` : `已切换到新身份「${name}」`)
         if (claimed) SD.ui.toast(`已将 ${claimed} 条本机历史记录归入「${name}」`)
@@ -1833,6 +1840,17 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
       SD.ui.confirm('确认这台设备创建了这个家庭？\n\n创建者可移除任何成员（含家人设备添加的）。', () => {
         SD.state.family.creator = true; SD.store.save(); settings(el)
       }, { okText: '我是创建者' })
+    })
+    /* 历史署名归集（创建者）：未署名 + 「家人」兜底显示的记录归入创建者本人 */
+    el.querySelector('#fam-claimorph')?.addEventListener('click', () => {
+      const me = SD.state.family.members.find(m => m.id === SD.state.family.selfId)
+      if (!me) return SD.ui.toast('请先设置本机身份')
+      SD.ui.confirm(`把全部未署名/显示为「家人」的历史记录归入「${me.name}」？\n\n有效署名与已删成员的称呼快照（如「奶奶」）不受影响；结果会同步到家人设备。`, () => {
+        const n = SD.summary.claimOrphans(SD.state.records, SD.state.family, me)
+        SD.store.save(); settings(el)
+        SD.ui.toast(`已归集 ${n} 条历史记录`)
+        SD.sync?.syncNow?.().catch(() => SD.sync?.schedulePush())
+      }, { okText: '归入我' })
     })
     el.querySelector('#fam-self')?.addEventListener('change', e => {
       const f = SD.state.family
@@ -1902,6 +1920,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
     }
     const joinSync = () => {
       const preChildIds = new Set(SD.state.children.map(c => c.id))
+      const preRecordIds = new Set(SD.state.records.map(r => r.id))   // 加入前本机记录：身份认领仅限这些，防误领家人历史
       const b = el.querySelector('#fam-sync')
       if (b) { b.disabled = true; b.textContent = '同步中…' }
       SD.sync.syncNow()
@@ -1920,9 +1939,9 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
           const arrived = SD.state.children.filter(c => !preChildIds.has(c.id))
           const localOnly = SD.state.children.filter(c => preChildIds.has(c.id))
           if (preChildIds.size === 1 && arrived.length === 1 && localOnly.length === 1)
-            return offerChildMerge(arrived[0], localOnly[0])
+            return offerChildMerge(arrived[0], localOnly[0], preRecordIds)
           settings(el); SD.app.render()
-          if (!mine) { SD.ui.toast('已拉取家人数据，请设置本机身份'); openIdentityModal(null, { creator: false }) }
+          if (!mine) { SD.ui.toast('已拉取家人数据，请设置本机身份'); openIdentityModal(null, { creator: false, claimOnly: preRecordIds }) }
         })
         .catch(err => { SD.ui.toast('加入同步失败：' + (err.message || '网络问题') + '——可点「立即同步」重试'); settings(el) })
     }
@@ -1961,7 +1980,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         .catch(err => { SD.ui.toast('自动同步失败：' + (err.message || '网络问题') + '——可点「立即同步」重试'); settings(el) })
     }
     /* 宝宝档案处理引导（加入家庭且本机已有档）：三选一——同时保留 / 合并为一份 / 丢弃本机只留家人数据 */
-    const offerChildMerge = (remoteChild, localChild) => {
+    const offerChildMerge = (remoteChild, localChild, claimOnly = null) => {
       document.getElementById('child-merge-modal')?.remove()
       const ov = document.createElement('div')
       ov.className = 'overlay'; ov.id = 'child-merge-modal'
@@ -1978,7 +1997,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         ov.remove(); settings(el); SD.app.render()
         /* 闭环：三种选择后若本机尚无身份（新设备首次加入），继续引导设置——身份落库时自动认领本机旧记录署名 */
         if (!SD.summary.ownMember(SD.state.family, SD.state.deviceId))
-          openIdentityModal(null, { creator: false })
+          openIdentityModal(null, { creator: false, claimOnly })
       }
       ov.addEventListener('click', e => { if (e.target === ov) finish() })
       ov.querySelector('#cm-keep').addEventListener('click', finish)

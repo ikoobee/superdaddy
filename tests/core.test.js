@@ -159,6 +159,35 @@ describe('summary: 今日汇总', () => {
     assert.equal(recs[2].by, 'm1')
   })
 
+  it('claimUnsigned 带 onlyIds 过滤：只认领指定 id（加入端防误领家人同步来的记录）', () => {
+    const member = { id: 'mB', name: '爸爸' }
+    const recs = [
+      { id: 'rLocal', type: 'pee', date: '2026-11-14' },                     // 本机加入前已有 → 认领
+      { id: 'rFromA', type: 'feed', date: '2026-11-14' },                    // 首同步拉来的家人记录 → 不动
+    ]
+    const n = SD.summary.claimUnsigned(recs, member, new Set(['rLocal']))
+    assert.equal(n, 1)
+    assert.equal(recs[0].by, 'mB')
+    assert.equal(recs[1].by, undefined)
+  })
+
+  it('claimOrphans：未署名与「家人」兜底显示的归入指定成员；有效署名/快照保留', () => {
+    const family = { members: [{ id: 'mA', name: '妈妈' }] }
+    const member = { id: 'mA', name: '妈妈' }
+    const recs = [
+      { type: 'pee', date: '2026-11-14' },                                   // 未署名 → 归集
+      { type: 'feed', date: '2026-11-14', by: 'gone' },                      // 孤儿无快照（显示家人）→ 归集
+      { type: 'sleep', date: '2026-11-14', by: 'gone', byName: '奶奶' },     // 快照在 → 保留
+      { type: 'vitd', date: '2026-11-14', by: 'mA' },                        // 有效署名 → 保留
+    ]
+    const n = SD.summary.claimOrphans(recs, family, member)
+    assert.equal(n, 2)
+    assert.equal(recs[0].by, 'mA'); assert.equal(recs[0].byName, '妈妈')
+    assert.equal(recs[1].by, 'mA')
+    assert.equal(recs[2].by, 'gone')                                         // 快照保留
+    assert.equal(recs[3].by, 'mA')
+  })
+
   it('mergeChildren：本机宝宝并入家人宝宝——记录重映射/疫苗并集/删档/activeId 修复', () => {
     const state = {
       children: [{ id: 'cKeep', name: '小宝', birth: '2026-08-15' }, { id: 'cDrop', name: '宝宝', birth: '2026-11-01' }],
