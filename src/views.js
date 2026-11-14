@@ -1810,8 +1810,12 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
       ov.querySelector('#rn-save').addEventListener('click', () => {
         const name = ov.querySelector('#rn-name').value.trim()
         if (!name) return SD.ui.toast('称呼不能为空')
-        m.name = name; m.role = ov.querySelector('#rn-role').value
-        m.renamedAt = new Date().toISOString()   // LWW：改名时间戳，防刷新竞态回滚
+        /* 竞态防护：自动拉取每 10s 会整体替换 SD.state（对象引用全部失效），
+           打字期间弹层捕获的 m 已是孤儿——保存时必须按 id 在当前 state 重新解析 */
+        const cur = SD.state.family?.members?.find(x => x.id === mid)
+        if (!cur) { ov.remove(); return SD.ui.toast('该成员已被移除，改名未保存') }
+        cur.name = name; cur.role = ov.querySelector('#rn-role').value
+        cur.renamedAt = new Date().toISOString()   // LWW：改名时间戳，防刷新竞态回滚
         SD.store.save(); ov.remove(); settings(el)
         SD.sync?.syncNow?.().catch(() => SD.sync?.schedulePush?.())   // 立即推送（不等防抖）；失败退回防抖重试
       })
