@@ -1829,11 +1829,38 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         SD.sync?.syncNow?.().catch(() => SD.sync?.schedulePush?.())   // 立即推送（不等防抖）；失败退回防抖重试
       })
     }
-    /* 退出家庭模式（回到单人；云同步一并关闭） */
+    /* 退出家庭模式：身份去向二选一——保留（可原身份重进，创建者列表暂留）/ 从家庭移除（墓碑传播，家人端自动消失） */
     el.querySelectorAll('[data-fam]').forEach(b => b.addEventListener('click', () => {
-      SD.ui.confirm('退出家庭模式？\n\n本机数据完整保留（含署名历史），云同步一并关闭。', () => {
-        SD.state.family = null; SD.state.sync = null; SD.store.save(); settings(el)
-      })
+      document.getElementById('exit-family-modal')?.remove()
+      const ov = document.createElement('div')
+      ov.className = 'overlay'; ov.id = 'exit-family-modal'
+      ov.innerHTML = `<div class="modal"><h3>退出家庭模式</h3>
+        <p class="note" style="display:block">本机数据完整保留（含署名历史），云同步关闭。你的成员身份如何处理？</p>
+        <p></p><div class="row"><button class="btn ghost" id="ex-keep">保留身份（之后可原身份重新加入）</button></div>
+        <p></p><div class="row"><button class="btn danger" id="ex-remove">从家庭移除我的身份（家人列表将不再显示我）</button></div>
+        <p></p><div class="row"><button class="btn ghost" id="ex-cancel">取消</button></div></div>`
+      document.body.appendChild(ov)
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+      ov.querySelector('#ex-cancel').addEventListener('click', () => ov.remove())
+      const doExit = async removeIdentity => {
+        const btn = ov.querySelector(removeIdentity ? '#ex-remove' : '#ex-keep')
+        btn.disabled = true; btn.textContent = '退出中…'
+        if (removeIdentity && SD.state.sync?.room) {
+          /* 先写成员墓碑并完成最后一次推送（必须在清 sync 之前，否则墓碑到不了家人） */
+          const f = SD.state.family
+          const ownIds = (f.localIds || []).filter(id => f.members.some(m => m.id === id))
+          f.removedMembers = [...new Set([...(f.removedMembers || []), ...ownIds])]
+          f.members = f.members.filter(m => !ownIds.includes(m.id))
+          SD.store.save()
+          try { await SD.sync.syncNow() }
+          catch { SD.ui.toast('离线：移除暂未同步到家人——可稍后重新加入再退出，或请创建者手动移除') }
+        }
+        SD.state.family = null; SD.state.sync = null; SD.store.save()
+        ov.remove(); settings(el); SD.app.render()
+        SD.ui.toast(removeIdentity ? '已退出家庭，身份已从家庭移除' : '已退出家庭（身份保留，可原身份重新加入）')
+      }
+      ov.querySelector('#ex-keep').addEventListener('click', () => doExit(false))
+      ov.querySelector('#ex-remove').addEventListener('click', () => doExit(true))
     }))
     el.querySelector('#fam-create')?.addEventListener('click', () => openIdentityModal())
     el.querySelector('#fam-newid')?.addEventListener('click', () => openIdentityModal())
