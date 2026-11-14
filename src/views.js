@@ -1788,7 +1788,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         const name = ov.querySelector('#id-name').value.trim()
         if (!name) return SD.ui.toast('请填一个称呼（家人一看就懂的那种）')
         const id = 'm' + Date.now().toString(36)
-        const member = { id, name, role: ov.querySelector('#id-role').value, deviceId: SD.state.deviceId }   // deviceId：重新加入时复用身份
+        const member = { id, name, role: ov.querySelector('#id-role').value, deviceId: SD.state.deviceId, createdAt: new Date().toISOString() }
         if (creating) SD.state.family = { members: [member], selfId: id, creator: opts.creator, localIds: [id] }
         else { SD.state.family.members.push(member); SD.state.family.localIds.push(id); SD.state.family.selfId = id }
         const claimed = SD.summary.claimUnsigned(SD.state.records, member, opts.claimOnly || null)
@@ -1796,6 +1796,8 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         SD.ui.toast(creating ? `家庭已创建 · 本机身份「${name}」` : `已切换到新身份「${name}」`)
         if (claimed) SD.ui.toast(`已将 ${claimed} 条本机历史记录归入「${name}」`)
         onDone ? onDone() : settings(el)
+        /* 新成员立即上中转：创建者手机要能马上看到加入者（首同步发生在此之前的弹层不会带上新成员） */
+        SD.sync?.syncNow?.().catch(() => SD.sync?.schedulePush?.())
       })
       ov.querySelector('#id-name').focus()
     }
@@ -1870,7 +1872,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
       if (f.selfId === id) f.selfId = (f.members.find(m => (f.localIds || []).includes(m.id))?.id) ?? null
       f.localIds = (f.localIds || []).filter(x => x !== id)
       SD.store.save(); settings(el)
-      SD.sync?.schedulePush?.()   // 移除传播到家人设备
+      SD.sync?.syncNow?.().catch(() => SD.sync?.schedulePush?.())   // 移除立即传播
     }))
     /* 加密上传告知弹层（用户核心要求：开启云同步必须明确说明数据以密文上传后端） */
     const openConsent = (onYes, onCancel = null) => {

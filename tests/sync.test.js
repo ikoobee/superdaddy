@@ -57,6 +57,14 @@ describe('sync: 未推送检测（重开补推）', () => {
     assert.equal(SD.sync.hasUnpushed({ records: [{ updatedAt: '2026-11-14T10:00:00Z' }], deletedIds: [] }, 0), true)
     assert.equal(SD.sync.hasUnpushed({ records: [], deletedIds: [] }, 0), false)
   })
+
+  it('家庭成员新增/改名晚于上次推送 → 需要补推（B 加入设身份场景）', () => {
+    const state = { records: [], deletedIds: [], family: { members: [{ id: 'mB', name: '爸爸', createdAt: '2026-11-14T12:00:00Z' }] } }
+    assert.equal(SD.sync.hasUnpushed(state, new Date('2026-11-14T11:00:00Z').getTime()), true)
+    assert.equal(SD.sync.hasUnpushed(state, new Date('2026-11-14T13:00:00Z').getTime()), false)
+    const renamed = { records: [], deletedIds: [], family: { members: [{ id: 'mB', name: '爸', renamedAt: '2026-11-14T14:00:00Z' }] } }
+    assert.equal(SD.sync.hasUnpushed(renamed, new Date('2026-11-14T13:00:00Z').getTime()), true)
+  })
 })
 
 describe('sync: 家庭码生成', () => {

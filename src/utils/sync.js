@@ -80,11 +80,13 @@ SD.sync = (() => {
     return stats || { recordsAdded: 0, recordsUpdated: 0 }
   }
 
-  /** 有比上次推送更新的记录/墓碑 → 需要补推（设备重开时把滞留本机的变更推上去） */
+  /** 有比上次推送更新的记录/墓碑/家庭成员变更 → 需要补推（设备重开时把滞留本机的变更推上去） */
   function hasUnpushed(state, lastPushMs) {
     const t = x => x.updatedAt || x.at
-    return (state.records || []).some(r => t(r) && new Date(t(r)).getTime() > lastPushMs)
-      || (state.deletedIds || []).some(d => d.at && new Date(d.at).getTime() > lastPushMs)
+    const after = x => x && new Date(x).getTime() > lastPushMs
+    return (state.records || []).some(r => t(r) && after(t(r)))
+      || (state.deletedIds || []).some(d => d.at && after(d.at))
+      || (state.family?.members || []).some(m => after(m.createdAt || m.renamedAt))   // 新成员/改名未推送
   }
 
   /** 拉取合并 + 检出未推送变更自动补推（启动/周期/回前台调用；失败不打扰） */
