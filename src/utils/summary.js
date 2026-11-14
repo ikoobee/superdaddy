@@ -28,6 +28,25 @@ SD.summary = {
     return n
   },
 
+  /**
+   * 宝宝档案合并（加入家庭时发现两边各建了一份同一宝宝）：dropId 并入 keepId（以家人档案为准）。
+   * 就地修改 state：记录 childId 重映射、疫苗并集、删除重复档、activeId 修复；返回重映射条数。
+   */
+  mergeChildren(state, keepId, dropId) {
+    let remapped = 0
+    for (const r of state.records || []) {
+      if (r.childId === dropId) { r.childId = keepId; remapped++ }
+    }
+    state.children = (state.children || []).filter(c => c.id !== dropId)
+    const vac = (state.vaccineDoneByChild = state.vaccineDoneByChild || {})
+    if (vac[dropId]) {
+      vac[keepId] = [...new Set([...(vac[keepId] || []), ...vac[dropId]])]
+      delete vac[dropId]
+    }
+    if (state.activeId === dropId) state.activeId = keepId
+    return { remapped }
+  },
+
   /** 单段睡眠分钟数：跨午夜（end < start）按入睡日 +24h；同时刻 = 0 */
   sleepMin(start, end) {
     const toMin = hm => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m }

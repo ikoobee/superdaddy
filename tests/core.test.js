@@ -139,6 +139,25 @@ describe('summary: 今日汇总', () => {
     assert.equal(recs[2].by, 'm1')
   })
 
+  it('mergeChildren：本机宝宝并入家人宝宝——记录重映射/疫苗并集/删档/activeId 修复', () => {
+    const state = {
+      children: [{ id: 'cKeep', name: '小宝', birth: '2026-08-15' }, { id: 'cDrop', name: '宝宝', birth: '2026-11-01' }],
+      activeId: 'cDrop',
+      records: [
+        { id: 'r1', childId: 'cDrop', type: 'feed' },
+        { id: 'r2', childId: 'cKeep', type: 'sleep' },
+      ],
+      vaccineDoneByChild: { cKeep: ['hbv1'], cDrop: ['bcg1', 'hbv1'] },
+    }
+    const { remapped } = SD.summary.mergeChildren(state, 'cKeep', 'cDrop')
+    assert.equal(remapped, 1)
+    assert.deepEqual(state.children.map(c => c.id), ['cKeep'])          // 重复档删除，家人档案为准
+    assert.equal(state.records.find(r => r.id === 'r1').childId, 'cKeep')
+    assert.deepEqual([...state.vaccineDoneByChild.cKeep].sort(), ['bcg1', 'hbv1'])
+    assert.equal(state.vaccineDoneByChild.cDrop, undefined)
+    assert.equal(state.activeId, 'cKeep')
+  })
+
   describe('记录人显示（authorName）', () => {
     const fam = { members: [{ id: 'm1', name: '妈妈' }, { id: 'm2', name: '爸爸' }], selfId: 'm1' }
     it('未署名或未开家庭 → null（不显示徽标）', () => {

@@ -1919,14 +1919,44 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
     })
     /* 首次配码（创建/加入）后立即自动同步一次：用户预期「加入即有数据」 */
     const runFirstSync = () => {
+      const preChildIds = new Set(SD.state.children.map(c => c.id))
       const b = el.querySelector('#fam-sync')
       if (b) { b.disabled = true; b.textContent = '同步中…' }
       SD.sync.syncNow()
         .then(st => {
+          /* 宝宝档案重复检测：加入前本机建过档 + 家人档新到 → 引导合并（双胞胎可保留两份） */
+          const arrived = SD.state.children.filter(c => !preChildIds.has(c.id))
+          const localOnly = SD.state.children.filter(c => preChildIds.has(c.id))
+          if (preChildIds.size === 1 && arrived.length === 1 && localOnly.length === 1)
+            return offerChildMerge(arrived[0], localOnly[0])
           SD.ui.toast(st.recordsAdded || st.recordsUpdated ? `同步完成：并入 ${st.recordsAdded} 条 · 更新 ${st.recordsUpdated} 条` : '同步完成')
           settings(el); SD.app.render()
         })
         .catch(err => { SD.ui.toast('自动同步失败：' + (err.message || '网络问题') + '——可点「立即同步」重试'); settings(el) })
+    }
+    /* 宝宝档案合并引导：以家人档案为准，本机记录重映射并入（mergeChildren 纯函数，不丢数据） */
+    const offerChildMerge = (remoteChild, localChild) => {
+      document.getElementById('child-merge-modal')?.remove()
+      const ov = document.createElement('div')
+      ov.className = 'overlay'; ov.id = 'child-merge-modal'
+      const info = c => `${esc(c.name)}（${c.birth ? '生日 ' + esc(c.birth) : '预产期 ' + esc(c.due || '—')}）`
+      ov.innerHTML = `<div class="modal"><h3>宝宝档案合并</h3>
+        <p class="note" style="display:block">本机与家人各建了一份宝宝档案（通常是各自添加了同一宝宝）。以<b>家人的档案为准</b>合并？本机记录会并入，不会丢失。</p>
+        <p>家人的：${info(remoteChild)}<br>本机的：${info(localChild)}</p>
+        <p></p><div class="row">
+          <button class="btn ghost" id="cm-keep">保留两份（如双胞胎）</button>
+          <button class="btn" id="cm-merge">合并为一份</button>
+        </div></div>`
+      document.body.appendChild(ov)
+      const finish = () => { ov.remove(); settings(el); SD.app.render() }
+      ov.addEventListener('click', e => { if (e.target === ov) finish() })
+      ov.querySelector('#cm-keep').addEventListener('click', finish)
+      ov.querySelector('#cm-merge').addEventListener('click', () => {
+        const { remapped } = SD.summary.mergeChildren(SD.state, remoteChild.id, localChild.id)
+        SD.store.save(); finish()
+        SD.ui.toast(`已合并宝宝档案 · 并入本机 ${remapped} 条记录`)
+        SD.sync.syncNow().catch(() => SD.sync.schedulePush())   // 合并结果立即对齐家人
+      })
     }
     el.querySelector('#fam-gencode')?.addEventListener('click', () => {
       const code = SD.sync.genCode()
