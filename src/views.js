@@ -598,6 +598,60 @@ SD.views = (() => {
     contraction: `宫缩 1 小时：${r.count} 次 · 间隔 ${r.gap} 分 · 持续 ${r.dur} 秒`,
   }[r.type] || r.type)
 
+  /* D1 记录编辑：按类型渲染可编辑字段；保存时按 id 重解析（state 可能被 10s 拉取整体替换） */
+  function openEditModal(el, rid) {
+    const r = SD.state.records.find(x => x.id === rid)
+    if (!r) return
+    document.getElementById('edit-modal')?.remove()
+    const ov = document.createElement('div')
+    ov.className = 'overlay'; ov.id = 'edit-modal'
+    const fields = [`<label class="field">日期</label><input type="date" id="ed-date" value="${r.date || ''}">`]
+    if (r.type === 'sleep') {
+      fields.push(`<label class="field">入睡时间</label><input type="time" id="ed-start" value="${r.start || ''}">`)
+      fields.push(`<label class="field">醒来时间（跨午夜可小于入睡）</label><input type="time" id="ed-end" value="${r.end || ''}">`)
+    } else if (r.time != null) {
+      fields.push(`<label class="field">时间</label><input type="time" id="ed-time" value="${r.time}">`)
+    }
+    if (r.type === 'feed' && SD.summary.feedMethod(r) === 'nurse') {
+      fields.push(`<label class="field">哪侧</label><select id="ed-side">${['L', 'R', 'B'].map(s => `<option value="${s}" ${r.side === s ? 'selected' : ''}>${({ L: '左', R: '右', B: '双侧' })[s]}</option>`).join('')}</select>`)
+      fields.push(`<label class="field">时长（分钟）</label><input type="number" id="ed-min" min="0" max="240" value="${r.minutes || 0}">`)
+    }
+    if (r.type === 'feed' && SD.summary.feedMethod(r) === 'formula') {
+      fields.push(`<label class="field">奶量（ml）</label><input type="number" id="ed-ml" min="1" max="500" value="${r.ml || 0}">`)
+    }
+    if (r.type === 'temp') {
+      fields.push(`<label class="field">时段</label><select id="ed-part">${['晨起', '午后', '晚间'].map(p => `<option ${r.part === p ? 'selected' : ''}>${p}</option>`).join('')}</select>`)
+      fields.push(`<label class="field">体温 (℃)</label><input type="number" step="0.1" min="34" max="43" id="ed-val" value="${r.val}">`)
+    }
+    ov.innerHTML = `<div class="modal"><h3>编辑记录</h3>${fields.join('')}
+      <p></p><div class="row"><button class="btn ghost" id="ed-cancel">取消</button><button class="btn" id="ed-save">保存</button></div></div>`
+    document.body.appendChild(ov)
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+    ov.querySelector('#ed-cancel').addEventListener('click', () => ov.remove())
+    ov.querySelector('#ed-save').addEventListener('click', () => {
+      const cur = SD.state.records.find(x => x.id === rid)   // 重解析：拉取竞态防护
+      if (!cur) { ov.remove(); return SD.ui.toast('记录已不存在') }
+      const date = ov.querySelector('#ed-date').value || cur.date
+      const t1 = ov.querySelector('#ed-start')?.value ?? ov.querySelector('#ed-time')?.value ?? cur.time ?? cur.start ?? ''
+      const chk = SD.time.validateWhen(date, t1)
+      if (!chk.ok) return SD.ui.toast(chk.msg)
+      if (cur.type === 'sleep' && ov.querySelector('#ed-start') && ov.querySelector('#ed-start').value === ov.querySelector('#ed-end').value)
+        return SD.ui.toast('入睡与醒来相同——跨午夜请把醒来填为较小时间')
+      cur.date = date
+      if (cur.type === 'sleep') { cur.start = ov.querySelector('#ed-start').value; cur.end = ov.querySelector('#ed-end').value }
+      else if (ov.querySelector('#ed-time')) cur.time = ov.querySelector('#ed-time').value
+      if (ov.querySelector('#ed-side')) cur.side = ov.querySelector('#ed-side').value
+      if (ov.querySelector('#ed-min')) cur.minutes = +ov.querySelector('#ed-min').value || 0
+      if (ov.querySelector('#ed-ml')) cur.ml = +ov.querySelector('#ed-ml').value || 0
+      if (ov.querySelector('#ed-part')) cur.part = ov.querySelector('#ed-part').value
+      if (ov.querySelector('#ed-val')) { const v = +ov.querySelector('#ed-val').value; if (v < 34 || v > 43) return SD.ui.toast('请输入 34-43 之间的体温值'); cur.val = v }
+      cur.updatedAt = new Date().toISOString()   // LWW：编辑即最新，合并不回滚
+      SD.store.save(); ov.remove(); feed(el)
+      SD.sync?.schedulePush?.()
+      SD.ui.toast('已保存修改')
+    })
+  }
+
   function feed(el) {
     if (!child()) return onboard(el)
     /* 类型筛选 + 天数翻页状态存 el.dataset（视图重渲染保持） */
@@ -616,14 +670,15 @@ SD.views = (() => {
       ${days.length
         ? days.map(d => `<div class="sec-title">${d.date}</div>` + d.items.map(r => `
           <div class="tl-item"><span class="icon">${iconOf(r)}</span><span class="desc">${esc(LABEL(r))}${(() => { const an = SD.summary.authorName(r, SD.state.family); return an ? `<span class="note"> · ${esc(an)}</span>` : '' })()}</span>
-          <span class="t">${r.time || r.start || ''}</span><button class="del" data-id="${r.id}">✕</button></div>`).join('')).join('') +
+          <span class="t">${r.time || r.start || ''}</span><button class="del" data-edit="${r.id}" title="编辑">✎</button><button class="del" data-id="${r.id}">✕</button></div>`).join('')).join('') +
           (daysShown < totalDays ? `<p></p><button class="btn ghost" id="tl-more" style="width:100%">查看更早（还有 ${totalDays - daysShown} 天）</button>` : '')
         : `<div class="empty"><p>还没有记录</p><p class="note">回首页用快捷按钮打卡</p></div>`}`
     el.querySelectorAll('[data-tlf]').forEach(b => b.addEventListener('click', () => {
       el.dataset.tlFilter = b.dataset.tlf; el.dataset.tlDays = 5; feed(el)
     }))
     el.querySelector('#tl-more')?.addEventListener('click', () => { el.dataset.tlDays = daysShown + 10; feed(el) })
-    el.querySelectorAll('.del').forEach(b => b.addEventListener('click', () => { SD.store.removeRecord(b.dataset.id); feed(el) }))
+    el.querySelectorAll('.del[data-id]').forEach(b => b.addEventListener('click', () => { SD.store.removeRecord(b.dataset.id); feed(el) }))
+    el.querySelectorAll('.del[data-edit]').forEach(b => b.addEventListener('click', () => openEditModal(el, b.dataset.edit)))
   }
 
   /* ══════════ 📈 成长（曲线 ｜ 疫苗 ｜ 里程碑 ｜ 月历） ══════════ */
@@ -683,6 +738,14 @@ SD.views = (() => {
         <div style="margin-top:8px">
           <div class="card"><h3>喂奶次数</h3>${bars(days7.map(d => ({ v: d.feedCount, l: d.date.slice(5) })), maxF, v => v || '')}</div>
           <div class="card"><h3>睡眠（小时）</h3>${bars(days7.map(d => ({ v: +(d.sleepMin / 60).toFixed(1), l: d.date.slice(5) })), +(maxS / 60).toFixed(1), v => v || '')}</div>
+          ${(() => {
+            const sum = k => days7.reduce((a, d) => a + (d[k] || 0), 0)
+            const avgN = (sum('nightCount') / 7).toFixed(1)
+            return `<div class="card"><h3>喂养洞察（近 7 日）</h3>
+              <p>🤱 亲喂 ${sum('nurseCount')} 次 · 🍼 奶粉 ${sum('formulaCount')} 次（共 ${sum('formulaMl')}ml）</p>
+              <p>🌙 夜奶（22:00–06:00）平均 <b>${avgN} 次/晚</b> · 昨夜 ${days7[6].nightCount} 次</p>
+              <p class="note">夜奶次数随月龄自然减少；奶粉总量参考「奶量参考」卡。数据为辅助观察，喂养方式以宝宝实际需要为准。</p></div>`
+          })()}
         </div>
         <div class="card"><h3>睡眠洞察（月龄参考 ${si.band.age}：${si.band.total}）</h3>
           <p>本周日均 <b>${h(si.avgMin)}h</b> · 参考 ${h(si.refLo)}-${h(si.refHi)}h

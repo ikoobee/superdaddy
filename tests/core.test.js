@@ -143,6 +143,20 @@ describe('summary: 今日汇总', () => {
     assert.equal(SD.time.validateWhen('2026-11-15', '', now).ok, true)               // 无时间只查日期
   })
 
+  it('last7Days：亲喂/奶粉分口径 + 夜奶计数（22:00-06:00 段）', () => {
+    const recs = [
+      { type: 'feed', method: 'nurse', date: '2026-11-15', time: '23:30' },   // 夜奶
+      { type: 'feed', method: 'formula', date: '2026-11-15', time: '02:00', ml: 120 },  // 夜奶（跨午夜归入睡日？此条 date=15 日凌晨——按 date 计在 15 日）
+      { type: 'feed', method: 'nurse', date: '2026-11-15', time: '10:00' },   // 白天
+      { type: 'feed', method: 'formula', date: '2026-11-15', time: '14:00', ml: 90 },
+    ]
+    const d = SD.trends.last7Days(recs, '2026-11-15').at(-1)
+    assert.equal(d.nurseCount, 2)
+    assert.equal(d.formulaCount, 2)
+    assert.equal(d.formulaMl, 210)
+    assert.equal(d.nightCount, 2)   // 23:30 与 02:00 在 22-6 段
+  })
+
   it('跨午夜睡眠（start>end）计入当日', () => {
     const s = summarizeDay([
       { type: 'sleep', date: '2026-09-15', start: '23:00', end: '01:30' },
