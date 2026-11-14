@@ -67,6 +67,7 @@ SD.summary = {
     })
     state.deletedIds = [...(state.deletedIds || []), ...[...dropIds].map(id => ({ id, at: now }))]
     state.children = (state.children || []).filter(c => c.id !== childId)
+    state.removedChildren = [...new Set([...(state.removedChildren || []), childId])]   // 档案墓碑：防合并复活
     const vac = (state.vaccineDoneByChild = state.vaccineDoneByChild || {})
     delete vac[childId]
     if (state.activeId === childId) state.activeId = state.children[0]?.id ?? null

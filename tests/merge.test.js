@@ -146,6 +146,25 @@ describe('merge: 集合并集与设备私有字段', () => {
     assert.deepEqual(state.family.localIds, [])
   })
 
+  it('宝宝移除墓碑：本机丢弃的档案不会被远端快照复活，且传播给远端', () => {
+    const now = new Date().toISOString()
+    const local = {
+      ...base(),
+      children: [{ id: 'cR', name: '小宝', birth: '2026-08-15' }],
+      records: [], removedChildren: ['cX'],
+      deletedIds: [{ id: 'r1', at: now }],   // 本机已删记录墓碑
+    }
+    const remote = {
+      ...base(),
+      children: [{ id: 'cR', name: '小宝', birth: '2026-08-15' }, { id: 'cX', name: '测试', birth: '2026-11-01' }],
+      records: [{ id: 'r1', type: 'feed', date: '2026-11-14', time: '08:00', childId: 'cX', updatedAt: now }],
+    }
+    const { state } = SD.merge.mergeState(local, remote)
+    assert.deepEqual(state.children.map(c => c.id), ['cR'])          // 档案不被复活
+    assert.ok(!state.records.some(r => r.id === 'r1'))               // 其记录也被墓碑拦截
+    assert.ok(state.removedChildren.includes('cX'))                  // 墓碑保留并随推送传播
+  })
+
   it('本机未开家庭而远端有：采纳远端成员名单，设备字段归零（加入流程先同步后设身份）', () => {
     const local = { ...base(), family: null }
     const remote = { ...base(), family: { members: [{ id: 'm1', name: '妈妈', deviceId: 'dA' }, { id: 'm2', name: '爸爸', deviceId: 'dB' }], selfId: 'm1', creator: true, localIds: ['m1'] } }

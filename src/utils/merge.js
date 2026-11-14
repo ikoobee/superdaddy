@@ -28,10 +28,13 @@ SD.merge = (() => {
     }
     const records = out.filter(r => !r.id || !tomb.has(r.id))
 
-    /* children 并集：同 id 时远端非空字段覆盖（档案改动传播），空值不覆盖 */
+    /* children 并集：同 id 时远端非空字段覆盖（档案改动传播），空值不覆盖；
+       removedChildren 墓碑并集过滤——丢弃/删除的档案不被远端快照复活，且删除跨设备传播 */
+    const goneChild = new Set([...(local.removedChildren || []), ...(remote.removedChildren || [])])
     const childMap = new Map()
-    for (const c of local.children || []) childMap.set(c.id, c)
+    for (const c of local.children || []) if (!goneChild.has(c.id)) childMap.set(c.id, c)
     for (const c of remote.children || []) {
+      if (goneChild.has(c.id)) continue
       const e = childMap.get(c.id)
       if (!e) childMap.set(c.id, c)
       else childMap.set(c.id, { ...e, ...Object.fromEntries(Object.entries(c).filter(([, v]) => v != null && v !== '')) })
@@ -84,6 +87,7 @@ SD.merge = (() => {
         ...local,   // lastBackup/feedRemind/sync 等设备字段保留本机
         records, deletedIds: [...tomb.entries()].map(([id, at]) => ({ id, at })),
         children,
+        removedChildren: [...goneChild],
         activeId,
         vaccineDoneByChild: vac,
         epdsHistory: [...epdsMap.values()],

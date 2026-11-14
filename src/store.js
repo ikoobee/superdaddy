@@ -31,8 +31,13 @@ SD.store = (() => {
     },
     switchChild(id) { SD.state.activeId = id; save() },
     removeChild(id, confirmText) {
+      const now = new Date().toISOString()
+      const dropIds = SD.state.records.filter(r => r.childId === id).map(r => r.id)
       SD.state.children = SD.state.children.filter(c => c.id !== id)
       SD.state.records = SD.state.records.filter(r => r.childId !== id)
+      /* 墓碑：记录防复活 + 档案防复活（合并拉取时远端快照不再带回） */
+      SD.state.deletedIds = [...(SD.state.deletedIds || []), ...dropIds.map(x => ({ id: x, at: now }))]
+      SD.state.removedChildren = [...new Set([...(SD.state.removedChildren || []), id])]
       delete SD.state.vaccineDoneByChild[id]
       if (SD.state.activeId === id) SD.state.activeId = SD.state.children[0]?.id ?? null
       save()
