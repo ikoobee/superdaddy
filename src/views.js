@@ -133,7 +133,7 @@ SD.views = (() => {
     const overdue = vacList.filter(v => v.status === 'overdue')
     const temps = SD.store.recordsOf().filter(r => r.type === 'temp' && r.date === SD.time.todayStr())
     const tempWarn = temps.length ? SD.features.tempStatus(p.totalMo, temps[temps.length - 1].val) : null
-    const suppTaken = SUPPS.filter(x => SD.store.recordsOf().some(r => r.type === x.key && r.date === SD.time.todayStr())).length
+    const suppTaken = DAILY_SUPPS.filter(x => SD.store.recordsOf().some(r => r.type === x.key && r.date === SD.time.todayStr())).length
     /* 喂养副行：方式拆分小字（图标与时间轴一致），主值保持与其他卡同量级 */
     const feedSub = s.feedCount
       ? [s.nurseCount ? `🤱${s.nurseCount}` : '', s.formulaCount ? `🍼${s.formulaCount}` : '', s.formulaMl ? `${s.formulaMl}ml` : ''].filter(Boolean).join(' · ')
@@ -153,7 +153,7 @@ SD.views = (() => {
         <div class="stat"><div class="k">今日喂养</div><div class="v">${s.feedCount} 次</div>${feedSub ? `<div class="sub">${feedSub}</div>` : ''}</div>
         <div class="stat"><div class="k">今日睡眠</div><div class="v">${(s.sleepMinutes / 60).toFixed(1)} 小时</div></div>
         <div class="stat"><div class="k">尿 / 便</div><div class="v">${s.pee} / ${s.poop}</div></div>
-        <div class="stat"><div class="k">补剂</div><div class="v ${suppTaken === SUPPS.length ? 'done' : ''}">${suppTaken}/${SUPPS.length}</div></div>
+        <div class="stat"><div class="k">维生素D</div><div class="v ${suppTaken ? 'done' : ''}">${suppTaken ? '已补' : '未补'}</div></div>
       </div>
       ${SD.state.feedRemind ? `<a class="card linkcard" id="feed-next-card" href="#feed-form">${feedCardInner(SD.feedPlan.feedPlan(c.birth, Date.now(), SD.store.recordsOf()))}</a>` : ''}
       <div class="quick-row">
@@ -176,7 +176,11 @@ SD.views = (() => {
       if (act === 'feed') return (location.hash = '#feed-form')
       if (act === 'sleep') return (location.hash = '#sleep-form')
       if (act === 'temp') return (location.hash = '#temp-form')
-      if (act === 'vitd') return (location.hash = '#supp-form')
+      if (act === 'vitd') {   // 唯一必须项：一键直打，不再进选择页
+        SD.store.addRecord({ type: 'vitd', date: SD.time.todayStr(), time: SD.time.nowTime() })
+        b.classList.add('done-flash'); setTimeout(() => { b.classList.remove('done-flash'); home(el) }, 450)
+        return
+      }
       SD.store.addRecord({ type: act, date: SD.time.todayStr(), time: SD.time.nowTime() })
       b.classList.add('done-flash'); setTimeout(() => { b.classList.remove('done-flash'); home(el) }, 450)
     }))
@@ -1371,11 +1375,13 @@ SD.views = (() => {
           <p>每日参考：${esc(n[3])}</p><p class="note">${esc(n[4])}</p></details>`).join('')}`
   }
 
+  /* 补剂简化为唯一必须项维生素D（BA45 循证收口）：铁/DHA 属医嘱选补，不占日常打卡位 */
   const SUPPS = [
-    { key: 'vitd', label: '维生素D₃', note: '出生数日后每日 400IU' },
+    { key: 'vitd', label: '维生素D₃', note: '出生数日后每日 400IU（唯一需每日补的）' },
     { key: 'dha', label: 'DHA', note: '按需，遵医嘱' },
     { key: 'iron', label: '铁剂', note: '早产/缺铁遵医嘱' },
   ]
+  const DAILY_SUPPS = [SUPPS[0]]   // 日常打卡仅维生素D
   function suppBody(el) {
     if (!child()) return onboard(el)
     const recs = SD.store.recordsOf()
@@ -1411,33 +1417,23 @@ SD.views = (() => {
     if (!child()) return onboard(el)
     const recs = SD.store.recordsOf()
     const days = SD.trends.last7Days(recs, SD.time.todayStr())
-    const taken = SUPPS.filter(x => recs.some(r => r.type === x.key && r.date === SD.time.todayStr())).length
-    el.innerHTML = `<div class="sec-title">补剂打卡</div>
+    const tk = recs.some(r => r.type === 'vitd' && r.date === SD.time.todayStr())
+    el.innerHTML = `<div class="sec-title">维生素D打卡</div>
       <div class="card">
-        <h3>💊 今日 ${taken}/${SUPPS.length}</h3>
-        ${SUPPS.map(s2 => {
-          const tk = recs.some(r => r.type === s2.key && r.date === SD.time.todayStr())
-          return `
-        <div class="supp-row">
-          <span class="supp-name">${s2.label}<i class="${tk ? 'on' : ''}">${tk ? '已补' : '未补'}</i></span>
-          <button class="supp-tap ${tk ? 'on' : ''}" data-supp="${s2.key}" title="${tk ? '点按撤销' : '点按打卡'}">${tk ? '✓' : '＋'}</button>
-        </div>
-        <div class="dots" style="margin:2px 0 8px">${days.map(d => {
-          const hit = recs.some(r => r.type === s2.key && r.date === d.date)
+        <h3>☀️ 今日维生素D：${tk ? '已补 ✓' : '未补'}</h3>
+        <div class="dots" style="margin:8px 0">${days.map(d => {
+          const hit = recs.some(r => r.type === 'vitd' && r.date === d.date)
           return `<span class="dot ${hit ? 'on' : ''}" title="${d.date}">${d.date.slice(5)}</span>`
-        }).join('')}</div>`
-        }).join('')}
-        <p class="note">${SUPPS.map(x => x.note).join('；')}——剂量遵医嘱。</p>
-        <p></p><button class="btn" id="supp-done">保存并回首页</button>
+        }).join('')}</div>
+        <p></p><button class="btn primary-big" id="supp-tap">${tk ? '撤销今日打卡' : '✓ 打卡今日维生素D'}</button>
+        <p class="note">维生素D 是唯一需每日补充的（出生数日后每日 400IU）；铁剂、DHA 属按医嘱选补，已从日常打卡简化掉——历史记录保留，科普见「育儿 · 辅食与营养」。剂量遵医嘱。</p>
       </div>`
-    el.querySelectorAll('[data-supp]').forEach(b => b.addEventListener('click', () => {
-      const k = b.dataset.supp
-      const today = SD.store.recordsOf().find(r => r.type === k && r.date === SD.time.todayStr())
+    el.querySelector('#supp-tap').addEventListener('click', () => {
+      const today = SD.store.recordsOf().find(r => r.type === 'vitd' && r.date === SD.time.todayStr())
       if (today) SD.store.removeRecord(today.id)
-      else SD.store.addRecord({ type: k, date: SD.time.todayStr(), time: SD.time.nowTime() })
+      else SD.store.addRecord({ type: 'vitd', date: SD.time.todayStr(), time: SD.time.nowTime() })
       suppForm(el)
-    }))
-    el.querySelector('#supp-done').addEventListener('click', () => (location.hash = '#home'))
+    })
   }
 
   /* 护理段：页内 Tab（体温 ｜ 宝宝健康 ｜ 妈妈） */
