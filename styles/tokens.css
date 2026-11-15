@@ -17,7 +17,9 @@
   --text-xl: 1.563rem; --text-2xl: 1.953rem; --text-3xl: 2.441rem;
 
   /* 间距（4 倍数） */
-  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px;
+  /* 控件统一高度体系（BA43）：标准触控行高 44 / 分段条 36 */
+  --ctl-h: 44px; --ctl-h-sm: 36px; --space-4: 16px;
   --space-6: 24px; --space-8: 32px;
 
   --radius-sm: 6px; --radius-md: 12px; --radius-lg: 18px;
