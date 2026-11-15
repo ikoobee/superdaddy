@@ -368,40 +368,59 @@ SD.views = (() => {
   function feedForm(el) {
     /* 奶粉默认奶量按月龄预填（milkRef 与待喂养卡同源；未出生/无档案回落 120） */
     const ref = (() => { const c = SD.store.child; return c && c.birth ? SD.features.milkRef(SD.time.ageParts(c.birth).totalMo) : null })()
+    /* 智能默认：记住上次方案/模式/侧别（localStorage，下次进来直达常用路径） */
+    const prefKey = 'sd-feed-pref'
+    const savePref = patch => { try { localStorage.setItem(prefKey, JSON.stringify({ ...JSON.parse(localStorage.getItem(prefKey) || '{}'), ...patch })) } catch {} }
+    const pref = (() => { try { return JSON.parse(localStorage.getItem(prefKey) || '{}') } catch { return {} } })()
+    const method = pref.method === 'formula' ? 'formula' : 'nurse'
+    const mode = pref.mode === 'manual' ? 'manual' : 'timer'
+    const lastSide = ['L', 'R', 'B'].includes(pref.side) ? pref.side : 'L'
     el.innerHTML = `<div class="sec-title">记录喂养</div>
       <div class="card">
         <div class="seg" id="f-method-seg">
-          <button class="seg-btn on" data-method="nurse">🤱 亲喂</button>
-          <button class="seg-btn" data-method="formula">🍼 奶粉</button>
+          <button class="seg-btn ${method === 'nurse' ? 'on' : ''}" data-method="nurse">🤱 亲喂</button>
+          <button class="seg-btn ${method === 'formula' ? 'on' : ''}" data-method="formula">🍼 奶粉</button>
         </div>
-        <div id="f-nurse">
+        <div id="f-nurse" ${method === 'nurse' ? '' : 'hidden'}>
           <div class="seg">
-            <button class="seg-btn on" data-mode="timer">⏱ 计时</button>
-            <button class="seg-btn" data-mode="manual">✍️ 手动</button>
+            <button class="seg-btn ${mode === 'timer' ? 'on' : ''}" data-mode="timer">⏱ 计时</button>
+            <button class="seg-btn ${mode === 'manual' ? 'on' : ''}" data-mode="manual">✍️ 手动</button>
           </div>
-          <div id="f-timer">
+          <div id="f-timer" ${mode === 'timer' ? '' : 'hidden'}>
             <div class="seg" id="f-side-seg">
-              <button class="seg-btn on" data-side="L">左</button>
-              <button class="seg-btn" data-side="R">右</button>
-              <button class="seg-btn" data-side="B">双侧</button>
+              <button class="seg-btn ${lastSide === 'L' ? 'on' : ''}" data-side="L">左</button>
+              <button class="seg-btn ${lastSide === 'R' ? 'on' : ''}" data-side="R">右</button>
+              <button class="seg-btn ${lastSide === 'B' ? 'on' : ''}" data-side="B">双侧</button>
             </div>
             <div class="timer-face idle" id="f-face"><span class="timer-dot" aria-hidden="true"></span><span id="f-clock">00:00</span></div>
             <button class="btn primary-big" id="f-go">▶ 开始亲喂</button>
             <button class="secondary-big" id="f-cancel-btn" hidden>取消计时</button>
             <p class="note" id="f-note"></p>
           </div>
-          <div id="f-manual" hidden>
+          <div id="f-manual" ${mode === 'manual' ? '' : 'hidden'}>
+            <div class="row">
+              <button class="btn ghost" data-fago="0" style="flex:1">刚刚</button>
+              <button class="btn ghost" data-fago="30" style="flex:1">½小时前</button>
+              <button class="btn ghost" data-fago="60" style="flex:1">1小时前</button>
+              <button class="btn ghost" data-fago="120" style="flex:1">2小时前</button>
+            </div>
             <label class="field">哪侧</label>
-            <select id="f-side"><option value="L">左</option><option value="R">右</option><option value="B">双侧</option></select>
+            <select id="f-side"><option value="L" ${lastSide === 'L' ? 'selected' : ''}>左</option><option value="R" ${lastSide === 'R' ? 'selected' : ''}>右</option><option value="B" ${lastSide === 'B' ? 'selected' : ''}>双侧</option></select>
             <label class="field">时长（分钟）</label><input type="number" id="f-min" value="15" min="0" max="120">
             <label class="field">日期（可补录往日）</label><input type="date" id="f-date">
             <label class="field">时间</label><input type="time" id="f-time">
             <p></p><button class="btn" id="f-save">保存</button>
           </div>
         </div>
-        <div id="f-formula" hidden>
+        <div id="f-formula" ${method === 'formula' ? '' : 'hidden'}>
           <label class="field">奶量（ml）</label><input type="number" id="f-fml" value="${ref ? ref.perMl : 120}" min="1" max="500">
           ${ref ? `<p class="note">月龄参考：每次约 ${ref.perMl}ml · 间隔约 ${ref.interval}h（可按需调整）</p>` : ''}
+          <div class="row">
+            <button class="btn ghost" data-fago="0" style="flex:1">刚刚</button>
+            <button class="btn ghost" data-fago="30" style="flex:1">½小时前</button>
+            <button class="btn ghost" data-fago="60" style="flex:1">1小时前</button>
+            <button class="btn ghost" data-fago="120" style="flex:1">2小时前</button>
+          </div>
           <label class="field">日期（可补录往日）</label><input type="date" id="f-fdate">
           <label class="field">时间</label><input type="time" id="f-ftime">
           <p></p><button class="btn" id="f-fsave">保存奶粉记录</button>
@@ -409,7 +428,7 @@ SD.views = (() => {
       </div>`
 
     /* 计时状态走 SD.timers 单例：切视图再回来不丢，可停止可取消；秒数由 startAt 推算 */
-    let side = 'L'
+    let side = lastSide
     el.querySelector('#f-time').value = SD.time.nowTime()
     el.querySelector('#f-ftime').value = SD.time.nowTime()
     for (const id of ['#f-date', '#f-fdate']) { const d = el.querySelector(id); d.max = SD.time.todayStr(); d.value = SD.time.todayStr() }
@@ -447,6 +466,7 @@ SD.views = (() => {
       const nurse = b.dataset.method === 'nurse'
       el.querySelector('#f-nurse').hidden = !nurse
       el.querySelector('#f-formula').hidden = nurse
+      savePref({ method: b.dataset.method })
     }))
     el.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
       if (isRunning()) return SD.ui.toast('计时中，请先停止或取消')
@@ -454,11 +474,22 @@ SD.views = (() => {
       const timer = b.dataset.mode === 'timer'
       el.querySelector('#f-timer').hidden = !timer
       el.querySelector('#f-manual').hidden = timer
+      savePref({ mode: b.dataset.mode })
     }))
     el.querySelectorAll('#f-side-seg .seg-btn').forEach(b => b.addEventListener('click', () => {
       if (isRunning()) return
       el.querySelectorAll('#f-side-seg .seg-btn').forEach(x => x.classList.remove('on')); b.classList.add('on')
       side = b.dataset.side
+      savePref({ side })
+    }))
+    /* 快捷时间 chips：点按=「约 X 分钟前」，自动填时间（日期归今天） */
+    el.querySelectorAll('[data-fago]').forEach(b => b.addEventListener('click', () => {
+      const t = new Date(Date.now() - (+b.dataset.fago) * 60e3)
+      const pad = n => String(n).padStart(2, '0')
+      const timeSel = b.closest('#f-manual') ? '#f-time' : '#f-ftime'
+      const dateSel = b.closest('#f-manual') ? '#f-date' : '#f-fdate'
+      el.querySelector(timeSel).value = `${pad(t.getHours())}:${pad(t.getMinutes())}`
+      el.querySelector(dateSel).value = SD.time.todayStr()
     }))
     el.querySelector('#f-go').addEventListener('click', () => {
       const t = SD.timers.get('feed')
@@ -1666,12 +1697,31 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
   ]
   let audioCtx = null, noiseNode = null, noiseStopTimer = null, heartTimer = null, autoStopMin = 0
   let kindTimers = []   // 雨/摇篮曲等事件调度器，stopNoise 统一清理
+  /* 播放时保持屏幕常亮（Wake Lock，iOS 16.4+/Android；不支持静默降级）+ 媒体会话元数据（提升后台存活/锁屏媒体控制） */
+  let wakeLock = null
+  async function keepAwake(on) {
+    if (on) {
+      try { wakeLock = await navigator.wakeLock?.request('screen') } catch { wakeLock = null }
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({ title: '白噪音 · 哄睡中', artist: '超级奶爸工作台' })
+          navigator.mediaSession.setActionHandler('pause', () => { stopNoise(); SD.noiseCtrl.refresh() })
+        } catch { /* 旧浏览器无 MediaMetadata */ }
+      }
+    } else {
+      try { wakeLock?.release?.() } catch {}
+      wakeLock = null
+      if ('mediaSession' in navigator) { try { navigator.mediaSession.metadata = null } catch {} }
+    }
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && noiseNode) keepAwake(true) })   // 锁在隐藏时自动释放，回前台重拿
   function stopNoise() {
     if (noiseStopTimer) { clearTimeout(noiseStopTimer); noiseStopTimer = null }
     if (heartTimer) { clearInterval(heartTimer); heartTimer = null }
     kindTimers.forEach(t => clearInterval(t)); kindTimers = []
     if (noiseNode) { try { noiseNode.stop() } catch {} noiseNode = null }
     if (audioCtx) { try { audioCtx.close() } catch {} audioCtx = null }
+    keepAwake(false)
   }
   function thump(vol = 0.9) {
     if (!audioCtx) return
@@ -1735,6 +1785,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
           <button class="seg-btn ${autoStopMin === 0 ? 'on' : ''}" data-min="0">不定时</button>
         </div>
         <p class="note" id="n-state">${playing ? '播放中' : ''}</p>
+        <p class="note">播放时自动保持屏幕常亮（不锁屏），可调低亮度省电；iOS 手动锁屏后系统会停止播放（平台限制）。</p>
       </div>
       <div class="card"><h3>5S 安抚法（Harvey Karp）</h3>
         <ul class="list">
@@ -1755,6 +1806,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
       if (noiseNode) {
         if (noiseStopTimer) clearTimeout(noiseStopTimer)
         if (autoStopMin) noiseStopTimer = setTimeout(() => { stopNoise(); SD.noiseCtrl.refresh() }, autoStopMin * 60000)
+        keepAwake(true)
       }
       sound(el)
     }))
@@ -1829,6 +1881,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
         noiseNode = loopNoise(kind, { gain: 0.5 })
       }
       if (autoStopMin) noiseStopTimer = setTimeout(() => { stopNoise(); SD.noiseCtrl.refresh() }, autoStopMin * 60000)
+        keepAwake(true)
       sound(el)
     })
     SD.noiseCtrl.refresh()
