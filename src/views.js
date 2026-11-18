@@ -134,6 +134,11 @@ SD.views = (() => {
     const temps = SD.store.recordsOf().filter(r => r.type === 'temp' && r.date === SD.time.todayStr())
     const tempWarn = temps.length ? SD.features.tempStatus(p.totalMo, temps[temps.length - 1].val) : null
     const suppTaken = DAILY_SUPPS.filter(x => SD.store.recordsOf().some(r => r.type === x.key && r.date === SD.time.todayStr())).length
+    /* 奶粉一键量（BA48）：最近一次奶粉 ml，无则月龄推荐 */
+    const quickMl = (() => {
+      const last = SD.store.recordsOf().filter(r => r.type === 'feed' && SD.summary.feedMethod(r) === 'formula').slice(-1)[0]
+      return last ? last.ml : SD.features.milkRef(p.totalMo).perMl
+    })()
     /* 喂养副行：方式拆分小字（图标与时间轴一致），主值保持与其他卡同量级 */
     const feedSub = s.feedCount
       ? [s.nurseCount ? `🤱${s.nurseCount}` : '', s.formulaCount ? `🍼${s.formulaCount}` : '', s.formulaMl ? `${s.formulaMl}ml` : ''].filter(Boolean).join(' · ')
@@ -158,6 +163,7 @@ SD.views = (() => {
       ${SD.state.feedRemind ? `<a class="card linkcard" id="feed-next-card" href="#feed-form">${feedCardInner(SD.feedPlan.feedPlan(c.birth, Date.now(), SD.store.recordsOf()))}</a>` : ''}
       <div class="quick-row">
         <button class="quick-btn primary" data-act="feed">🍼 喂养</button>
+        <button class="quick-btn" data-act="formula">🍼 奶粉${quickMl}</button>
         <button class="quick-btn" data-act="sleep">😴 睡觉</button>
         <button class="quick-btn" data-act="temp">🌡️ 体温</button>
         <button class="quick-btn" data-act="pee">💧 尿</button>
@@ -174,6 +180,12 @@ SD.views = (() => {
     el.querySelectorAll('.quick-btn[data-act]').forEach(b => b.addEventListener('click', () => {
       const act = b.dataset.act
       if (act === 'feed') return (location.hash = '#feed-form')
+      if (act === 'formula') {   // 一键奶粉：上次量/月龄参考量即点即记，量不对用时间轴 ✎ 改
+        SD.store.addRecord({ type: 'feed', method: 'formula', date: SD.time.todayStr(), time: SD.time.nowTime(), ml: quickMl })
+        SD.ui.toast(`已记奶粉 ${quickMl}ml（时间轴 ✎ 可改量/时间）`)
+        b.classList.add('done-flash'); setTimeout(() => { b.classList.remove('done-flash'); home(el) }, 450)
+        return
+      }
       if (act === 'sleep') return (location.hash = '#sleep-form')
       if (act === 'temp') return (location.hash = '#temp-form')
       if (act === 'vitd') {   // 唯一必须项：一键直打，不再进选择页
