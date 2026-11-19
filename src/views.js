@@ -134,11 +134,6 @@ SD.views = (() => {
     const temps = SD.store.recordsOf().filter(r => r.type === 'temp' && r.date === SD.time.todayStr())
     const tempWarn = temps.length ? SD.features.tempStatus(p.totalMo, temps[temps.length - 1].val) : null
     const suppTaken = DAILY_SUPPS.filter(x => SD.store.recordsOf().some(r => r.type === x.key && r.date === SD.time.todayStr())).length
-    /* 奶粉一键量（BA48）：最近一次奶粉 ml，无则月龄推荐 */
-    const quickMl = (() => {
-      const last = SD.store.recordsOf().filter(r => r.type === 'feed' && SD.summary.feedMethod(r) === 'formula').slice(-1)[0]
-      return last ? last.ml : SD.features.milkRef(p.totalMo).perMl
-    })()
     /* 喂养副行：方式拆分小字（图标与时间轴一致），主值保持与其他卡同量级 */
     const feedSub = s.feedCount
       ? [s.nurseCount ? `🤱${s.nurseCount}` : '', s.formulaCount ? `🍼${s.formulaCount}` : '', s.formulaMl ? `${s.formulaMl}ml` : ''].filter(Boolean).join(' · ')
@@ -163,7 +158,6 @@ SD.views = (() => {
       ${SD.state.feedRemind ? `<a class="card linkcard" id="feed-next-card" href="#feed-form">${feedCardInner(SD.feedPlan.feedPlan(c.birth, Date.now(), SD.store.recordsOf()))}</a>` : ''}
       <div class="quick-row">
         <button class="quick-btn primary" data-act="feed">🍼 喂养</button>
-        <button class="quick-btn" data-act="formula">🍼 奶粉${quickMl}</button>
         <button class="quick-btn" data-act="sleep">😴 睡觉</button>
         <button class="quick-btn" data-act="temp">🌡️ 体温</button>
         <button class="quick-btn" data-act="pee">💧 尿</button>
@@ -180,12 +174,6 @@ SD.views = (() => {
     el.querySelectorAll('.quick-btn[data-act]').forEach(b => b.addEventListener('click', () => {
       const act = b.dataset.act
       if (act === 'feed') return (location.hash = '#feed-form')
-      if (act === 'formula') {   // 一键奶粉：上次量/月龄参考量即点即记，量不对用时间轴 ✎ 改
-        SD.store.addRecord({ type: 'feed', method: 'formula', date: SD.time.todayStr(), time: SD.time.nowTime(), ml: quickMl })
-        SD.ui.toast(`已记奶粉 ${quickMl}ml（时间轴 ✎ 可改量/时间）`)
-        b.classList.add('done-flash'); setTimeout(() => { b.classList.remove('done-flash'); home(el) }, 450)
-        return
-      }
       if (act === 'sleep') return (location.hash = '#sleep-form')
       if (act === 'temp') return (location.hash = '#temp-form')
       if (act === 'vitd') {   // 唯一必须项：一键直打，不再进选择页
@@ -430,6 +418,13 @@ SD.views = (() => {
         </div>
         <div id="f-formula" ${method === 'formula' ? '' : 'hidden'}>
           <label class="field">奶量（ml）</label><input type="number" id="f-fml" value="${ref ? ref.perMl : 120}" min="1" max="500">
+          ${(() => {   // 常用容量 chips：最近用量 + 月龄推荐 + 常见档位（去重取 4，升序）
+            const recs = SD.store.recordsOf().filter(r => r.type === 'feed' && SD.summary.feedMethod(r) === 'formula').slice(-8)
+            const recent = [...new Set(recs.map(r => r.ml).filter(Boolean))].slice(0, 2)
+            const pool = [...recent, ref ? ref.perMl : 120, ...[90, 120, 150, 180, 210, 240]]
+            const chips = [...new Set(pool)].slice(0, 4).sort((a, b) => a - b)
+            return `<div class="row">${chips.map(m => `<button class="btn ghost" data-ml="${m}" style="flex:1">${m}</button>`).join('')}</div>`
+          })()}
           ${ref ? `<p class="note">月龄参考：每次约 ${ref.perMl}ml · 间隔约 ${ref.interval}h（可按需调整）</p>` : ''}
           <div class="row">
             <button class="btn ghost" data-fago="0" style="flex:1">刚刚</button>
@@ -497,6 +492,10 @@ SD.views = (() => {
       el.querySelectorAll('#f-side-seg .seg-btn').forEach(x => x.classList.remove('on')); b.classList.add('on')
       side = b.dataset.side
       savePref({ side })
+    }))
+    /* 常用容量 chips：一键填奶量 */
+    el.querySelectorAll('[data-ml]').forEach(b => b.addEventListener('click', () => {
+      el.querySelector('#f-fml').value = b.dataset.ml
     }))
     /* 快捷时间 chips：点按=「约 X 分钟前」，自动填时间（日期归今天） */
     el.querySelectorAll('[data-fago]').forEach(b => b.addEventListener('click', () => {
