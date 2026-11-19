@@ -1951,6 +1951,7 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
       <div class="sec-title">宝宝档案（${st.children.length} 个）</div>
       ${st.children.map(c => `
         <div class="tl-item"><span class="desc"><b>${esc(c.name)}</b> · ${c.birth ? esc(c.birth) : '预产期 ' + esc(c.due)} · ${({ m: '男', f: '女' }[c.gender] || '—')}</span>
+          <button class="btn ghost" data-cedit="${c.id}">改名</button>
           ${!c.birth ? `<button class="btn ghost" data-born="${c.id}">🎉 出生了</button>` : ''}
           ${c.id === st.activeId ? '<span class="vac-badge done">当前</span>' : `<button class="btn ghost" data-sw="${c.id}">切换</button>`}
           <button class="del" data-rm="${c.id}">✕</button></div>`).join('')}
@@ -2027,6 +2028,35 @@ ${(() => {   // 家庭模式：按成员署名统计今日记录（孤儿署名�
 
     el.querySelector('#s-open-add').addEventListener('click', () =>
       openAddModal(() => { location.hash = '#settings'; SD.app.render() }))
+    /* 宝宝档案编辑（BA49）：改名 + 生日修正；updatedAt 走档案 LWW 跨端传播 */
+    const openChildEditModal = cid => {
+      const c0 = SD.state.children.find(x => x.id === cid)
+      if (!c0) return
+      document.getElementById('child-edit-modal')?.remove()
+      const ov = document.createElement('div')
+      ov.className = 'overlay'; ov.id = 'child-edit-modal'
+      ov.innerHTML = `<div class="modal"><h3>编辑宝宝档案</h3>
+        <label class="field">昵称</label><input type="text" id="ce-name" maxlength="12" value="${esc(c0.name)}">
+        ${c0.birth ? `<label class="field">生日（修正错填；日龄/疫苗/曲线随之重算）</label><input type="date" id="ce-birth" value="${c0.birth}" max="${SD.time.todayStr()}">` : ''}
+        <p class="note" style="display:block">改名与生日修正会同步到家人设备（合并按时间取新）。</p>
+        <p></p><div class="row"><button class="btn ghost" id="ce-cancel">取消</button><button class="btn" id="ce-save">保存</button></div></div>`
+      document.body.appendChild(ov)
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+      ov.querySelector('#ce-cancel').addEventListener('click', () => ov.remove())
+      ov.querySelector('#ce-save').addEventListener('click', () => {
+        const cur = SD.state.children.find(x => x.id === cid)   // 竞态规则：动作时重解析
+        if (!cur) { ov.remove(); return SD.ui.toast('档案已不存在') }
+        const name = ov.querySelector('#ce-name').value.trim()
+        if (!name) return SD.ui.toast('昵称不能为空')
+        cur.name = name
+        const birthEl = ov.querySelector('#ce-birth')
+        if (birthEl && birthEl.value && /^\d{4}-\d{2}-\d{2}$/.test(birthEl.value)) cur.birth = birthEl.value
+        cur.updatedAt = new Date().toISOString()   // 档案 LWW
+        SD.store.save(); ov.remove(); settings(el); SD.app.render()
+        SD.sync?.syncNow?.().catch(() => SD.sync?.schedulePush?.())   // 立即传播
+      })
+    }
+    el.querySelectorAll('[data-cedit]').forEach(b => b.addEventListener('click', () => openChildEditModal(b.dataset.cedit)))
     el.querySelector('#s-feedremind').addEventListener('change', e => { SD.state.feedRemind = e.target.checked; SD.store.save() })
     el.querySelector('#s-suppremind').addEventListener('change', e => {
       SD.state.suppRemindAt = e.target.checked ? '10:00' : null
