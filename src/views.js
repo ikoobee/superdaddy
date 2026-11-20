@@ -477,6 +477,7 @@ SD.views = (() => {
             <button class="btn ghost" data-fago="60" style="flex:1">1小时前</button>
             <button class="btn ghost" data-fago="120" style="flex:1">2小时前</button>
           </div>
+          <label class="field">吃了多久（分钟，可选——喝奶变慢是健康信号）</label><input type="number" id="f-fmin" min="0" max="120" placeholder="不填则不记时长">
           <label class="field">日期（可补录往日）</label><input type="date" id="f-fdate">
           <label class="field">时间</label><input type="time" id="f-ftime">
           <p></p><button class="btn" id="f-fsave">保存奶粉记录</button>
@@ -588,7 +589,8 @@ SD.views = (() => {
       const time = el.querySelector('#f-ftime').value || SD.time.nowTime()
       const chk = SD.time.validateWhen(date, time)
       if (!chk.ok) return SD.ui.toast(chk.msg)
-      SD.store.addRecord({ type: 'feed', method: 'formula', date, time, ml })
+      const mins = +el.querySelector('#f-fmin').value
+      SD.store.addRecord({ type: 'feed', method: 'formula', date, time, ml, ...(mins > 0 ? { minutes: mins } : {}) })
       SD.ui.toast(`已记录奶粉 ${ml}ml`)
       location.hash = '#feed'
     })
@@ -758,7 +760,7 @@ SD.views = (() => {
   const LABEL = r => ({
     feed: SD.summary.feedMethod(r) === 'nurse'
       ? `亲喂（${({ L: '左', R: '右', B: '双侧' })[r.side] || ''}${r.minutes ? ' ' + r.minutes + 'min' : ''}）`
-      : `奶粉 ${r.ml || 0}ml`,
+      : `奶粉 ${r.ml || 0}ml${r.minutes ? ` · ${r.minutes}min` : ''}`,
     sleep: `睡眠 ${r.start}–${r.end}${r.start && r.end ? `（${(SD.summary.sleepMin(r.start, r.end) / 60).toFixed(1)}h）` : ''}`, pee: '尿尿', poop: '便便', vitd: '维生素D', dha: 'DHA', iron: '铁剂',
     temp: `体温 ${r.val}℃（${r.part || ''}）`,
     measure: `测量 身高${r.height || '-'}cm 体重${r.weight || '-'}kg${r.head ? ' 头围' + r.head + 'cm' : ''}`,
@@ -792,6 +794,7 @@ SD.views = (() => {
     }
     if (r.type === 'feed' && SD.summary.feedMethod(r) === 'formula') {
       fields.push(`<label class="field">奶量（ml）</label><input type="number" id="ed-ml" min="1" max="500" value="${r.ml || 0}">`)
+      fields.push(`<label class="field">吃了多久（分钟，可空）</label><input type="number" id="ed-fmin" min="0" max="120" value="${r.minutes || ''}">`)
     }
     if (r.type === 'temp') {
       fields.push(`<label class="field">时段</label><select id="ed-part">${['晨起', '午后', '晚间'].map(p => `<option ${r.part === p ? 'selected' : ''}>${p}</option>`).join('')}</select>`)
@@ -817,6 +820,7 @@ SD.views = (() => {
       if (ov.querySelector('#ed-side')) cur.side = ov.querySelector('#ed-side').value
       if (ov.querySelector('#ed-min')) cur.minutes = +ov.querySelector('#ed-min').value || 0
       if (ov.querySelector('#ed-ml')) cur.ml = +ov.querySelector('#ed-ml').value || 0
+      if (ov.querySelector('#ed-fmin')) { const m = +ov.querySelector('#ed-fmin').value; if (m > 0) cur.minutes = m; else delete cur.minutes }
       if (ov.querySelector('#ed-part')) cur.part = ov.querySelector('#ed-part').value
       if (ov.querySelector('#ed-val')) { const v = +ov.querySelector('#ed-val').value; if (v < 34 || v > 43) return SD.ui.toast('请输入 34-43 之间的体温值'); cur.val = v }
       cur.updatedAt = new Date().toISOString()   // LWW：编辑即最新，合并不回滚
