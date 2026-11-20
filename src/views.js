@@ -39,6 +39,8 @@ SD.views = (() => {
   let feedTick = null, feedToastAt = null, feedVisArmed = false
   /* 补剂到时提醒：30s 心跳内检查，每天至多提示一次 */
   let suppToastDay = null
+  /* 睡眠被动结束提示：选「继续计时」后 10 分钟内不再问（同轮护理连打卡不连弹） */
+  let sleepAskDismissed = 0
   /* 睡眠计时白天超时提醒：每次计时只提醒一次（按 startAt 去重） */
   let sleepOvertimeAt = 0
   function feedTickOnce() {
@@ -171,8 +173,8 @@ SD.views = (() => {
       ${overdue.length ? `<a class="card linkcard" href="#vaccine"><h3>⚠️ 待补疫苗 ${overdue.length} 剂</h3><p class="note">${esc(overdue.slice(0, 4).map(v => v.name).join('、'))}${overdue.length > 4 ? '…' : ''} → 去标记</p></a>` : ''}
       ${next ? `<a class="card linkcard" href="#vaccine"><h3>下一剂疫苗</h3><p>${esc(next.name)} 第${next.dose}剂 · ${next.sched}</p></a>` : ''}`
 
-    el.querySelectorAll('.quick-btn[data-act]').forEach(b => b.addEventListener('click', () => {
-      const act = b.dataset.act
+    /* 快捷动作：喂养/尿/便 意味着宝宝醒了——睡眠计时中先弹「结束？」（梦餵可继续；选继续后 10 分钟静默防同轮护理连弹） */
+    const doAct = (b, act) => {
       if (act === 'feed') return (location.hash = '#feed-form')
       if (act === 'sleep') return (location.hash = '#sleep-form')
       if (act === 'temp') return (location.hash = '#temp-form')
@@ -183,6 +185,36 @@ SD.views = (() => {
       }
       SD.store.addRecord({ type: act, date: SD.time.todayStr(), time: SD.time.nowTime() })
       b.classList.add('done-flash'); setTimeout(() => { b.classList.remove('done-flash'); home(el) }, 450)
+    }
+    const AWAKE_ACTS = ['feed', 'pee', 'poop']
+    el.querySelectorAll('.quick-btn[data-act]').forEach(b => b.addEventListener('click', () => {
+      const act = b.dataset.act
+      const sl = SD.timers.get('sleep')
+      if (sl && AWAKE_ACTS.includes(act) && Date.now() - sleepAskDismissed > 10 * 60e3) {
+        const mins = SD.time.clockMinutes(SD.timers.elapsed(sl))
+        document.getElementById('awake-modal')?.remove()
+        const ov = document.createElement('div')
+        ov.className = 'overlay'; ov.id = 'awake-modal'
+        const what = act === 'feed' ? '喂奶' : act === 'pee' ? '换尿' : '换尿布'
+        ov.innerHTML = `<div class="modal"><h3>😴 睡眠计时中 · 已 ${mins} 分钟</h3>
+          <p class="note" style="display:block">要${what}了——宝宝醒了吗？</p>
+          <p></p><div class="row"><button class="btn ghost" id="aw-continue">没醒，继续计时</button></div>
+          <p></p><div class="row"><button class="btn" id="aw-end">醒了，结束并记录睡眠</button></div></div>`
+        document.body.appendChild(ov)
+        const finish = () => { ov.remove(); doAct(b, act) }
+        ov.addEventListener('click', e => { if (e.target === ov) { sleepAskDismissed = Date.now(); ov.remove() } })
+        ov.querySelector('#aw-continue').addEventListener('click', () => { sleepAskDismissed = Date.now(); finish() })
+        ov.querySelector('#aw-end').addEventListener('click', () => {
+          SD.timers.stop('sleep')
+          if (mins >= 1) {
+            SD.store.addRecord({ type: 'sleep', date: sl.startDate, start: sl.startStr, end: SD.time.nowTime() })
+            SD.ui.toast(`本次睡眠 ${(mins / 60).toFixed(1)} 小时已记录`)
+          }
+          finish()
+        })
+        return
+      }
+      doAct(b, act)
     }))
     armFeedTicker()
   }
