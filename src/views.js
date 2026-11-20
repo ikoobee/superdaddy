@@ -39,11 +39,24 @@ SD.views = (() => {
   let feedTick = null, feedToastAt = null, feedVisArmed = false
   /* 补剂到时提醒：30s 心跳内检查，每天至多提示一次 */
   let suppToastDay = null
-  /* 睡眠被动结束提示：选「继续计时」后 10 分钟内不再问（同轮护理连打卡不连弹） */
+  /* 睡眠被动结束提示：选「继续计时」后 5 分钟内不再问（同轮护理连打卡不连弹）；
+     若 45 分钟仍未停止 → 轻提示一次兜底（防静默窗口吞掉真醒，夜间尤其重要） */
   let sleepAskDismissed = 0
+  let sleepNudgeKey = ''
   /* 睡眠计时白天超时提醒：每次计时只提醒一次（按 startAt 去重） */
   let sleepOvertimeAt = 0
   function feedTickOnce() {
+    /* 「继续计时」后的兜底：45 分钟仍未停止 → 轻提示一次（每次「继续」只提醒一次；防静默窗口吞掉真醒） */
+    {
+      const sl = SD.timers.get('sleep')
+      if (sl && sleepAskDismissed && Date.now() - sleepAskDismissed > 45 * 60e3) {
+        const key = sl.startAt + ':' + sleepAskDismissed
+        if (sleepNudgeKey !== key) {
+          sleepNudgeKey = key
+          SD.ui.toast(`😴 睡眠已计时 ${Math.round(SD.timers.elapsed(sl) / 60000)} 分钟——宝宝还睡吗？已醒请去停止并校对`)
+        }
+      }
+    }
     /* 睡眠计时白天超 4h 未停 → 提醒校对（夜间长睡不扰） */
     {
       const sl = SD.timers.get('sleep')
@@ -190,7 +203,7 @@ SD.views = (() => {
     el.querySelectorAll('.quick-btn[data-act]').forEach(b => b.addEventListener('click', () => {
       const act = b.dataset.act
       const sl = SD.timers.get('sleep')
-      if (sl && AWAKE_ACTS.includes(act) && Date.now() - sleepAskDismissed > 10 * 60e3) {
+      if (sl && AWAKE_ACTS.includes(act) && Date.now() - sleepAskDismissed > 5 * 60e3) {
         const mins = SD.time.clockMinutes(SD.timers.elapsed(sl))
         document.getElementById('awake-modal')?.remove()
         const ov = document.createElement('div')
